@@ -137,10 +137,11 @@ async function loadPlaylistDiscoveries() {
   const results = await Promise.allSettled(picks.map(async pick => {
     const url = `https://www.youtube.com/watch?v=${pick.videoId}`;
     const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, {next: {revalidate: 86400}});
-    const meta = response.ok ? await response.json() : {};
-    return {title: meta.title || `A video from Andrew's ${pick.shelf} shelf`, url, summary: `Pulled from Andrew's saved ${pick.shelf} playlist—not from his uploads.`, date: null, source: meta.author_name || `YouTube · ${pick.shelf}`, section: /camera/i.test(pick.shelf) ? "PHOTOGRAPHY" : /movie|film/i.test(pick.shelf) ? "FILM + CULTURE" : "MUSIC", image: meta.thumbnail_url || `https://i.ytimg.com/vi/${pick.videoId}/hqdefault.jpg`, score: 68, interestHits: 3, noHits: 0, videoId: pick.videoId, format: "video"};
+    if (!response.ok) return null;
+    const meta = await response.json();
+    return {title: meta.title, url, summary: "", date: null, source: meta.author_name, section: /camera/i.test(pick.shelf) ? "PHOTOGRAPHY" : /movie|film/i.test(pick.shelf) ? "FILM + CULTURE" : "MUSIC", image: meta.thumbnail_url || `https://i.ytimg.com/vi/${pick.videoId}/hqdefault.jpg`, score: 68, interestHits: 3, noHits: 0, videoId: pick.videoId, format: "video"};
   }));
-  const items = []; results.forEach(result => { if (result.status === "fulfilled") items.push(result.value); });
+  const items = []; results.forEach(result => { if (result.status === "fulfilled" && result.value) items.push(result.value); });
   return items.filter(item => !/andrew ault|drsuperfresh/i.test(item.source) && !isDisallowed(item));
 }
 async function loadBandcampReleases() {
