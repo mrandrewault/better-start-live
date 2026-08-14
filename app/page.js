@@ -23,7 +23,7 @@ export default function Home() {
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const date = now.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
   const wall = useMemo(() => { const stories = [...(data?.gallery || [])], media = [...(data?.media || [])], result = []; while (stories.length || media.length) { result.push(...stories.splice(0, 2)); if (media.length) result.push(media.shift()); } return result; }, [data]);
-  const visible = useMemo(() => wall.slice(0, expanded ? 30 : 18), [wall, expanded]);
+  const visible = useMemo(() => wall.slice(0, expanded ? 30 : 22), [wall, expanded]);
   const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartFeedback", JSON.stringify(ratings.slice(-250))); };
   return <main className="shell">
     <header className="mast"><div><div className="brand">Better Start <i>— Andrew&apos;s Edition</i></div><div className="edition">A curious morning, composed for you</div></div><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Better Start Radio ${radio ? "on" : "off"}`} title="Better Start Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button></header>
@@ -34,7 +34,7 @@ export default function Home() {
     <section className="favoritesSection"><div className="sectionHead"><div><span>From people you follow</span><h2>Just In From Your Favorites</h2></div><p>Recent posts, not an inbox</p></div><div className="favorites">{(data?.favorites || []).map(item => <a className="favorite" href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl}><span>{age(item.date)}</span><h3>{item.title}</h3><b>{item.name}</b></a>)}</div></section>
 
     <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Your coffee table</span><h2>Good Stuff</h2></div><p>Chosen for joy, curiosity & variety</p></div>{visible.length ? <div className="gallery">{visible.map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div> : <div className="loading"><span>Composing today&apos;s wall</span><i /><i /><i /></div>}
-      {wall.length > 18 && <div className="loadWrap"><button className="loadBtn" onClick={() => setExpanded(!expanded)}>{expanded ? "Fold the magazines back up" : "Load More Good Stuff"}<span>→</span></button></div>}
+      {wall.length > 22 && <div className="loadWrap"><button className="loadBtn" onClick={() => setExpanded(!expanded)}>{expanded ? "Fold the magazines back up" : "Load More Good Stuff"}<span>→</span></button></div>}
     </section>
 
     <section className="important"><div className="importantIntro"><span>Importance override</span><h2>You Should Know</h2><p>A small, calm briefing of consequential stories—kept distinct from the things chosen simply to brighten your morning.</p></div><div className="importantGrid">{(data?.important || []).map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div></section>

@@ -201,8 +201,8 @@ export async function GET() {
   const ribbonFavorite = claim(favoriteItems.slice(0, 1))[0] || null;
   const favoriteSelection = claim(favoriteItems).slice(0, 6);
   const goodNews = claim(compose(all.filter(isGoodNews), 1))[0] || null;
-  const [youtubeItems, bandcampItems, instagramItem] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases(), loadInstagramProfile()]);
-  const mediaPool = unique([...bandcampItems, ...youtubeItems, ...(instagramItem ? [instagramItem] : [])]);
+  const [youtubeItems, bandcampItems] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases()]);
+  const mediaPool = unique([...bandcampItems, ...youtubeItems]);
   const media = claim(compose(mediaPool, 7));
   const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));
   const important = claim(compose(importantPool, 3));
