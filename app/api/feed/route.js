@@ -31,6 +31,18 @@ function imageFor(item) {
   return item.enclosure?.url || item.mediaContent?.$?.url || item.mediaThumbnail?.$?.url || html.match(/<img[^>]+src=["']([^"']+)/i)?.[1] || null;
 }
 function itemText(item) { return `${item.title || ""} ${item.contentSnippet || ""} ${item.content || ""}`.toLowerCase(); }
+function isDisallowed(item) {
+  const value = `${item.title || ""} ${item.summary || ""} ${item.contentSnippet || ""}`.toLowerCase();
+  return /\b(trump|maga|white house|mar-a-lago|gop|republican party|democratic party|democrats|congress|senate|house speaker|pentagon|department of justice|doj|ice agents?|fbi|supreme court|presidential election|midterms?|campaign trail|rfk jr|jd vance|stephen miller|karoline leavitt|washington politics|android|google pixel|pixel phone|samsung galaxy|samsung phone|windows laptop|windows pc|microsoft surface|dell laptop|dell computer|lenovo laptop|chromebook)\b/i.test(value);
+}
+function isJoyful(item) {
+  const value = `${item.title || ""} ${item.summary || ""}`;
+  return /discover|new|beautiful|guide|best|love|return|release|photo|album|art|music|food|travel|space|nature|design|book|film|restor|celebrat|rescue|record|garden|recipe|festival|museum/i.test(value) && !/killed|deadly|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|begging|dashed dreams|cranky|torches|revolt|horrific/i.test(value);
+}
+function isGoodNews(item) {
+  const value = `${item.title || ""} ${item.summary || ""}`;
+  return /discover|beautiful|love|return|restor|celebrat|rescue|breakthrough|success|wins?\b|record|opens?|reun|reviv|saved?|found/i.test(value) && isJoyful(item);
+}
 function score(item, source, taste) {
   const text = itemText(item); let value = (source.quality || 5) * 5, hits = 0, noHits = 0;
   for (const raw of taste.yes) if (text.includes(raw.toLowerCase())) { value += 8; if (++hits >= 7) break; }
@@ -42,8 +54,8 @@ function score(item, source, taste) {
 }
 function formatFor(item, index) {
   if (item.videoId) return "video";
-  if (item.image && /photography|art \+ design/i.test(item.section)) return "visual";
   if (item.image && index % 7 === 0) return "feature";
+  if (item.image && (/photography|art \+ design/i.test(item.section) || index % 3 === 1)) return "visual";
   if (!item.image || (item.summary || "").length < 90) return "blurb";
   return "article";
 }
@@ -105,7 +117,7 @@ export async function GET() {
   let all = [];
   results.forEach(result => { if (result.status === "fulfilled") all.push(...result.value); });
   const video = playlistFeature(); if (video) all.push(video);
-  all = unique(all.filter(item => item.score > 18).sort((a, b) => b.score - a.score));
+  all = unique(all.filter(item => item.score > 18 && !isDisallowed(item) && isJoyful(item)).sort((a, b) => b.score - a.score));
 
   const favoriteResults = await Promise.allSettled(favorites.map(async favorite => {
     const feed = await parser.parseURL(favorite.url);
@@ -113,7 +125,7 @@ export async function GET() {
   }));
   let favoriteItems = [];
   favoriteResults.forEach(result => { if (result.status === "fulfilled") favoriteItems.push(...result.value); });
-  favoriteItems = unique(favoriteItems.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
+  favoriteItems = unique(favoriteItems.filter(item => !isDisallowed(item) && isJoyful(item)).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
 
   // One shared registry across every page region makes duplicates impossible.
   const usedUrls = new Set(), usedTitles = new Set();
@@ -124,12 +136,13 @@ export async function GET() {
   });
   const ribbonFavorite = claim(favoriteItems.slice(0, 1))[0] || null;
   const favoriteSelection = claim(favoriteItems).slice(0, 6);
-  const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source));
+  const goodNews = claim(compose(all.filter(isGoodNews), 1))[0] || null;
+  const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));
   const important = claim(compose(importantPool, 3));
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
   const gallery = claim(compose(galleryPool, 24));
-  const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && !usedUrls.has(canonicalUrl(item.url)));
+  const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && isJoyful(item) && !usedUrls.has(canonicalUrl(item.url)));
   const serendipity = claim(compose(serendipityPool, 3));
 
-  return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, favorites: favoriteSelection, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
+  return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, goodNews, favorites: favoriteSelection, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
 }

@@ -5,6 +5,7 @@ const FALLBACK = "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?a
 const categoryClass = section => `cat-${(section || "news").toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
 function age(date) { if (!date) return "From the shelf"; const hours = (Date.now() - new Date(date)) / 36e5; return hours < 1 ? `${Math.max(1, Math.round(hours * 60))} min ago` : hours < 24 ? `${Math.round(hours)} hr ago` : `${Math.round(hours / 24)}d ago`; }
 function Feedback({item, onRate}) { return <div className="controls" aria-label="Story feedback"><button onClick={() => onRate(item, "more")}>♡ More like this</button><button onClick={() => onRate(item, "less")}>Less</button><button onClick={() => onRate(item, "political")}>Too political</button><button onClick={() => onRate(item, "depressing")}>Too depressing</button></div>; }
+function RollingFact({label, children}) { return <div className="rollingFact"><b>{label}</b><span className="ticker"><i>{children}</i></span></div>; }
 function Story({item, index, onRate}) {
   const type = item.format || "article";
   return <article className={`tile tile-${type} tile-pattern-${index % 9} ${categoryClass(item.section)}`}>
@@ -24,11 +25,11 @@ export default function Home() {
     <header className="mast"><div><div className="brand">Better Start <i>— Andrew&apos;s Edition</i></div><div className="edition">A curious morning, composed for you</div></div><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Better Start Radio ${radio ? "on" : "off"}`} title="Better Start Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button></header>
     <div className="hello"><h1>{greeting}.</h1><p>{date}</p></div>
 
-    <section className="ribbon" aria-label="Quick facts"><div><b>New Canaan</b><span>{weather?.high ? `${weather.high}° / ${weather.low}° · ${weather.precip}% rain` : "Forecast loading…"}</span></div><div><b>Live edition</b><span>{data ? `${data.sourceStatus.successful} of ${data.sourceStatus.total} feeds connected` : "Gathering stories…"}</span></div><div><b>Freshest favorite</b><span>{data?.ribbonFavorite?.title || "Checking your writers…"}</span></div><div><b>Today&apos;s mix</b><span>Ideas · art · music · wonder</span></div></section>
+    <section className="ribbon" aria-label="Quick facts"><div className="weatherFact"><b>New Canaan</b><span>{weather?.high ? `${weather.high}° / ${weather.low}° · ${weather.precip}% rain` : "Forecast loading…"}</span></div><RollingFact label="Freshest favorite">{data?.ribbonFavorite?.title || "Checking your writers…"}</RollingFact><RollingFact label="A little good news">{data?.goodNews?.title || "Finding something cheerful…"}</RollingFact></section>
 
     <section className="favoritesSection"><div className="sectionHead"><div><span>From people you follow</span><h2>Just In From Your Favorites</h2></div><p>Recent posts, not an inbox</p></div><div className="favorites">{(data?.favorites || []).map(item => <a className="favorite" href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl}><span>{age(item.date)}</span><h3>{item.title}</h3><b>{item.name}</b></a>)}</div></section>
 
-    <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Your coffee table</span><h2>Good Stuff, Artfully Arranged</h2></div><p>Chosen for variety—not just score</p></div>{visible.length ? <div className="gallery">{visible.map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div> : <div className="loading"><span>Composing today&apos;s wall</span><i /><i /><i /></div>}
+    <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Your coffee table</span><h2>Good Stuff</h2></div><p>Chosen for joy, curiosity & variety</p></div>{visible.length ? <div className="gallery">{visible.map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div> : <div className="loading"><span>Composing today&apos;s wall</span><i /><i /><i /></div>}
       {data?.gallery?.length > 14 && <div className="loadWrap"><button className="loadBtn" onClick={() => setExpanded(!expanded)}>{expanded ? "Fold the magazines back up" : "Load More Good Stuff"}<span>→</span></button></div>}
     </section>
 
