@@ -37,7 +37,11 @@ function isDisallowed(item) {
 }
 function isJoyful(item) {
   const value = `${item.title || ""} ${item.summary || ""}`;
-  return /discover|new|beautiful|guide|best|love|return|release|photo|album|art|music|food|travel|space|nature|design|book|film|restor|celebrat|rescue|record|garden|recipe|festival|museum|wins?\b|victory|comeback|walk[ -]?off|advance|prospect|adopt|reunited|kindness|community|uplifting|inspir|opens?/i.test(value) && !/killed|deadly|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|begging|dashed dreams|cranky|torches|revolt|horrific|tariffs?|banned|terrible|domestic unrest|abuse|neglect|euthan|injur|los(?:e|es|ing)|defeat/i.test(value);
+  return /discover|new|beautiful|guide|best|love|return|release|photo|album|art|music|food|travel|space|nature|design|book|film|restor|celebrat|rescue|record|garden|recipe|festival|museum|wins?\b|victory|comeback|walk[ -]?off|advance|prospect|adopt|reunited|kindness|community|uplifting|inspir|opens?/i.test(value) && !/killed|deadly|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|begging|dashed dreams|cranky|torches|revolt|horrific|tariffs?|banned|terrible|domestic unrest|abuse|neglect|euthan|injur|los(?:e|es|ing)|defeat|rough update|brutally honest|worsen|\bworst\b/i.test(value);
+}
+function isFreshLocal(item) {
+  if (item.section !== "LOCAL + GOOD" || !item.date) return true;
+  return (Date.now() - new Date(item.date)) / 864e5 <= 60;
 }
 function isGoodNews(item) {
   const value = `${item.title || ""} ${item.summary || ""}`;
@@ -49,6 +53,8 @@ function score(item, source, taste) {
   for (const raw of taste.no) if (text.includes(raw.toLowerCase())) { value -= 24; noHits++; }
   const hours = item.isoDate ? (Date.now() - new Date(item.isoDate)) / 36e5 : 24;
   value += hours <= 6 ? 10 : hours <= 24 ? 6 : hours <= 48 ? 2 : -Math.min(12, hours / 24);
+  if (/new canaan|fairfield county|connecticut|new haven|yale|new york city|hudson valley|upstate new york|catskills|berkshires|vermont/i.test(text)) value += 18;
+  if (/restaurants?|dining|where to eat|food guide/i.test(text) && /ohio state|bloomington,? indiana|austin,? texas|los angeles|miami|chicago/i.test(text)) value -= 38;
   if (/you won't believe|internet is freaking|shocking|what happened next/i.test(item.title || "")) value -= 15;
   return {score: Math.round(value), interestHits: hits, noHits};
 }
@@ -183,7 +189,7 @@ export async function GET() {
   let all = [];
   results.forEach(result => { if (result.status === "fulfilled") all.push(...result.value); });
   const video = playlistFeature(); if (video) all.push(video);
-  all = unique(all.filter(item => item.score > 18 && !isDisallowed(item) && isJoyful(item)).sort((a, b) => b.score - a.score));
+  all = unique(all.filter(item => item.score > 18 && !isDisallowed(item) && isJoyful(item) && isFreshLocal(item)).sort((a, b) => b.score - a.score));
 
   const favoriteResults = await Promise.allSettled(favorites.map(async favorite => {
     const feed = await parser.parseURL(favorite.url);
