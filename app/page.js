@@ -8,8 +8,11 @@ function Feedback({item, onRate}) { return <div className="controls" aria-label=
 function RollingFact({label, children}) { return <div className="rollingFact"><b>{label}</b><span className="ticker"><i>{children}</i></span></div>; }
 function Story({item, index, onRate}) {
   const type = item.format || "article";
+  const [playing, setPlaying] = useState(false);
+  const playable = type === "video" || type === "bandcamp";
+  const playerUrl = type === "video" ? `https://www.youtube-nocookie.com/embed/${item.videoId}?autoplay=1&rel=0` : item.embedUrl;
   return <article className={`tile tile-${type} tile-pattern-${index % 9} ${categoryClass(item.section)}`}>
-    {item.image && <a className="imageLink" href={item.url} target="_blank" rel="noreferrer"><img src={item.image} alt="" onError={event => {event.currentTarget.src = FALLBACK;}} />{type === "video" && <span className="play">▶</span>}</a>}
+    {playable && playing ? <div className="inlinePlayer"><iframe src={playerUrl} title={item.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : item.image && (playable ? <button className="imageLink mediaTrigger" onClick={() => setPlaying(true)} aria-label={`Play ${item.title}`}><img src={item.image} alt="" onError={event => {event.currentTarget.src = FALLBACK;}} /><span className="play">▶</span></button> : <a className="imageLink" href={item.url} target="_blank" rel="noreferrer"><img src={item.image} alt="" onError={event => {event.currentTarget.src = FALLBACK;}} /></a>)}
     <div className="tileBody"><div className="kicker"><span>{item.section}</span><span>{age(item.date)}</span></div><h3><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></h3>{item.summary && type !== "visual" && <p>{item.summary.slice(0, type === "feature" ? 280 : 170)}</p>}<div className="meta">{item.source}</div><Feedback item={item} onRate={onRate}/></div>
   </article>;
 }
@@ -19,7 +22,8 @@ export default function Home() {
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); fetch("/api/feed").then(response => response.json()).then(setData).catch(() => {}); fetch("/api/weather").then(response => response.json()).then(setWeather).catch(() => {}); return () => clearInterval(timer); }, []);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const date = now.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
-  const visible = useMemo(() => (data?.gallery || []).slice(0, expanded ? 24 : 14), [data, expanded]);
+  const wall = useMemo(() => { const stories = [...(data?.gallery || [])], media = [...(data?.media || [])], result = []; while (stories.length || media.length) { result.push(...stories.splice(0, 2)); if (media.length) result.push(media.shift()); } return result; }, [data]);
+  const visible = useMemo(() => wall.slice(0, expanded ? 30 : 18), [wall, expanded]);
   const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartFeedback", JSON.stringify(ratings.slice(-250))); };
   return <main className="shell">
     <header className="mast"><div><div className="brand">Better Start <i>— Andrew&apos;s Edition</i></div><div className="edition">A curious morning, composed for you</div></div><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Better Start Radio ${radio ? "on" : "off"}`} title="Better Start Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button></header>
@@ -30,7 +34,7 @@ export default function Home() {
     <section className="favoritesSection"><div className="sectionHead"><div><span>From people you follow</span><h2>Just In From Your Favorites</h2></div><p>Recent posts, not an inbox</p></div><div className="favorites">{(data?.favorites || []).map(item => <a className="favorite" href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl}><span>{age(item.date)}</span><h3>{item.title}</h3><b>{item.name}</b></a>)}</div></section>
 
     <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Your coffee table</span><h2>Good Stuff</h2></div><p>Chosen for joy, curiosity & variety</p></div>{visible.length ? <div className="gallery">{visible.map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div> : <div className="loading"><span>Composing today&apos;s wall</span><i /><i /><i /></div>}
-      {data?.gallery?.length > 14 && <div className="loadWrap"><button className="loadBtn" onClick={() => setExpanded(!expanded)}>{expanded ? "Fold the magazines back up" : "Load More Good Stuff"}<span>→</span></button></div>}
+      {wall.length > 18 && <div className="loadWrap"><button className="loadBtn" onClick={() => setExpanded(!expanded)}>{expanded ? "Fold the magazines back up" : "Load More Good Stuff"}<span>→</span></button></div>}
     </section>
 
     <section className="important"><div className="importantIntro"><span>Importance override</span><h2>You Should Know</h2><p>A small, calm briefing of consequential stories—kept distinct from the things chosen simply to brighten your morning.</p></div><div className="importantGrid">{(data?.important || []).map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div></section>

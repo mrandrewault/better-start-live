@@ -104,6 +104,70 @@ function playlistFeature() {
   return {title: `A video from Andrew's ${playlist} shelf`, url: `https://www.youtube.com/watch?v=${videoId}`, source: "YouTube library", section: /camera/i.test(playlist) ? "PHOTOGRAPHY" : "MUSIC", summary: `A daily find from the existing ${playlist} playlist.`, date: null, image: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, score: 52, interestHits: 1, noHits: 0, videoId, format: "video"};
 }
 
+function youtubeSubscriptions() {
+  const lines = fs.readFileSync(dataPath("subscriptions.csv"), "utf8").split(/\r?\n/).slice(1);
+  return lines.map(line => {
+    const match = line.match(/^([^,]+),[^,]*,(?:"([^"]+)"|(.+))$/);
+    return match ? {id: match[1], name: match[2] || match[3]} : null;
+  }).filter(Boolean).filter(channel => !/andrew ault|drsuperfresh/i.test(channel.name));
+}
+async function loadYouTubeDiscoveries() {
+  const affinity = /music|jazz|synth|record|photo|camera|film|cinema|norm|comedy|dead|beatles|stones|dylan|criterion|leica|moog|piano|concert/i;
+  const channels = youtubeSubscriptions().filter(channel => affinity.test(channel.name));
+  const day = Math.floor(Date.now() / 86400000), rotated = channels.slice(day % Math.max(1, channels.length)).concat(channels.slice(0, day % Math.max(1, channels.length))).slice(0, 16);
+  const results = await Promise.allSettled(rotated.map(async channel => {
+    const feed = await parser.parseURL(`https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`);
+    return (feed.items || []).slice(0, 2).map(item => {
+      const videoId = item.id?.split(":").pop() || item.link?.match(/[?&]v=([^&]+)/)?.[1];
+      return {title: plain(item.title), url: item.link, summary: `A recent find from one of Andrew's YouTube subscriptions.`, date: item.isoDate || item.pubDate || null, source: channel.name, section: /photo|camera|leica/i.test(channel.name) ? "PHOTOGRAPHY" : /film|cinema/i.test(channel.name) ? "FILM + CULTURE" : "MUSIC", image: videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null, score: 66, interestHits: 2, noHits: 0, videoId, format: "video"};
+    });
+  }));
+  const items = []; results.forEach(result => { if (result.status === "fulfilled") items.push(...result.value); });
+  return items.filter(item => item.videoId && !isDisallowed(item) && isJoyful(item)).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+}
+async function loadPlaylistDiscoveries() {
+  const preferred = ["funny shit-videos.csv", "Movie clips-videos.csv", "Film Class-videos.csv", "Favorites-videos.csv", "Blue Notes-videos.csv", "Synth-videos.csv", "GD-videos.csv", "Camera-videos.csv", "Concerts-videos.csv"];
+  const day = Math.floor(Date.now() / 86400000), picks = [];
+  preferred.forEach((file, index) => {
+    const rows = fs.readFileSync(dataPath(file), "utf8").trim().split(/\r?\n/).slice(1);
+    const videoId = rows[(day * (index + 3)) % rows.length]?.split(",")[0];
+    if (videoId) picks.push({videoId, shelf: file.replace(/-videos\.csv$/, "")});
+  });
+  const results = await Promise.allSettled(picks.map(async pick => {
+    const url = `https://www.youtube.com/watch?v=${pick.videoId}`;
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, {next: {revalidate: 86400}});
+    const meta = response.ok ? await response.json() : {};
+    return {title: meta.title || `A video from Andrew's ${pick.shelf} shelf`, url, summary: `Pulled from Andrew's saved ${pick.shelf} playlist—not from his uploads.`, date: null, source: meta.author_name || `YouTube · ${pick.shelf}`, section: /camera/i.test(pick.shelf) ? "PHOTOGRAPHY" : /movie|film/i.test(pick.shelf) ? "FILM + CULTURE" : "MUSIC", image: meta.thumbnail_url || `https://i.ytimg.com/vi/${pick.videoId}/hqdefault.jpg`, score: 68, interestHits: 3, noHits: 0, videoId: pick.videoId, format: "video"};
+  }));
+  const items = []; results.forEach(result => { if (result.status === "fulfilled") items.push(result.value); });
+  return items.filter(item => !/andrew ault|drsuperfresh/i.test(item.source) && !isDisallowed(item));
+}
+async function loadBandcampReleases() {
+  const sources = load("bandcamp-sources.json");
+  const results = await Promise.allSettled(sources.map(async source => {
+    const response = await fetch(new URL("music", source.url), {headers: {"User-Agent": "BetterStart/2.0"}, next: {revalidate: 3600}});
+    const html = await response.text(), items = [];
+    const blockPattern = /<li data-item-id="(album|track)-(\d+)"[\s\S]*?<a href="([^"]+)"[\s\S]*?<img src="([^"]+)"[\s\S]*?<p class="title">([\s\S]*?)<\/p>[\s\S]*?<\/li>/g;
+    for (const match of html.matchAll(blockPattern)) {
+      const titleText = plain(match[5].replace(/<br\s*\/?>/gi, " — "));
+      const url = new URL(match[3], source.url).toString();
+      items.push({title: titleText, url, summary: `A new-release shelf pick from ${source.name}. Click to listen.`, date: null, source: source.name, section: "MUSIC", image: match[4], score: 72, interestHits: 3, noHits: 0, format: "bandcamp", embedUrl: `https://bandcamp.com/EmbeddedPlayer/${match[1]}=${match[2]}/size=large/bgcol=fffefa/linkcol=d23d32/tracklist=false/artwork=small/transparent=true/`});
+      if (items.length >= 3) break;
+    }
+    return items;
+  }));
+  const items = []; results.forEach(result => { if (result.status === "fulfilled") items.push(...result.value); });
+  return items;
+}
+async function loadInstagramProfile() {
+  try {
+    const url = "https://www.instagram.com/andrew.ault.photography/";
+    const html = await (await fetch(url, {headers: {"User-Agent": "Mozilla/5.0"}, next: {revalidate: 21600}})).text();
+    const image = html.match(/property="og:image" content="([^"]+)/)?.[1]?.replace(/&amp;/g, "&");
+    return {title: "A visual pause from Andrew Ault Photography", url, summary: "A doorway into Andrew's public photography feed.", date: null, source: "@andrew.ault.photography", section: "PHOTOGRAPHY", image, score: 70, interestHits: 3, noHits: 0, format: "social"};
+  } catch { return null; }
+}
+
 export async function GET() {
   const taste = load("taste.json"), sources = load("sources.json"), favorites = load("favorites.json");
   const results = await Promise.allSettled(sources.map(async source => {
@@ -137,6 +201,9 @@ export async function GET() {
   const ribbonFavorite = claim(favoriteItems.slice(0, 1))[0] || null;
   const favoriteSelection = claim(favoriteItems).slice(0, 6);
   const goodNews = claim(compose(all.filter(isGoodNews), 1))[0] || null;
+  const [youtubeItems, bandcampItems, instagramItem] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases(), loadInstagramProfile()]);
+  const mediaPool = unique([...bandcampItems, ...youtubeItems, ...(instagramItem ? [instagramItem] : [])]);
+  const media = claim(compose(mediaPool, 7));
   const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));
   const important = claim(compose(importantPool, 3));
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
@@ -144,5 +211,5 @@ export async function GET() {
   const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && isJoyful(item) && !usedUrls.has(canonicalUrl(item.url)));
   const serendipity = claim(compose(serendipityPool, 3));
 
-  return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, goodNews, favorites: favoriteSelection, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
+  return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, goodNews, favorites: favoriteSelection, media, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
 }

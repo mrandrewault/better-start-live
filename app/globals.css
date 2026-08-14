@@ -14,3 +14,7 @@
 .importantGrid,.serendipityGrid{align-items:start}.important .tile,.serendipityGrid .tile{min-height:0;height:auto}.important .tileBody,.serendipityGrid .tileBody{min-height:175px}
 @media(max-width:650px){.ribbon{display:flex}.weatherFact{flex:0 0 auto!important}.rollingFact{flex:0 0 300px!important}.gallery{grid-auto-rows:10px}.tile{grid-row:auto!important}.important .tile,.serendipityGrid .tile{min-height:0}}
 @media(prefers-reduced-motion:reduce){.ticker i{animation:none;padding-left:0}.ticker{overflow:auto;mask-image:none}}
+
+/* V4 multimedia frames */
+.tile-bandcamp{--accent:var(--red);grid-column:span 3;grid-row:span 20}.tile-social{--accent:var(--navy);grid-column:span 3;grid-row:span 20}.mediaTrigger{width:100%;padding:0;border:0;background:#111;cursor:pointer;text-align:left}.inlinePlayer{position:relative;flex:1 1 50%;min-height:190px;background:#111}.inlinePlayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.tile-bandcamp .inlinePlayer{min-height:145px;background:var(--card)}.tile-bandcamp .imageLink img,.tile-social .imageLink img{aspect-ratio:1;min-height:0}.tile-bandcamp h3{font-family:"Space Grotesk",sans-serif}.tile-social h3{font-family:"DM Serif Display",serif}
+@media(max-width:650px){.tile-bandcamp,.tile-social{width:calc(50% - 5px);grid-column:span 2;min-height:320px}.inlinePlayer{min-height:205px}}
