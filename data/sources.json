@@ -1,0 +1,92 @@
+[
+  {
+    "name": "NPR Music",
+    "url": "https://feeds.npr.org/1039/rss.xml",
+    "section": "MUSIC",
+    "quality": 9
+  },
+  {
+    "name": "Pitchfork",
+    "url": "https://pitchfork.com/rss/news/",
+    "section": "MUSIC",
+    "quality": 8
+  },
+  {
+    "name": "Stereogum",
+    "url": "https://www.stereogum.com/feed/",
+    "section": "MUSIC",
+    "quality": 8
+  },
+  {
+    "name": "DPReview",
+    "url": "https://www.dpreview.com/feeds/news.xml",
+    "section": "PHOTOGRAPHY",
+    "quality": 8
+  },
+  {
+    "name": "PetaPixel",
+    "url": "https://petapixel.com/feed/",
+    "section": "PHOTOGRAPHY",
+    "quality": 7
+  },
+  {
+    "name": "Criterion",
+    "url": "https://www.criterion.com/current/rss",
+    "section": "FILM + CULTURE",
+    "quality": 9
+  },
+  {
+    "name": "NYT Arts",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml",
+    "section": "ART + DESIGN",
+    "quality": 9
+  },
+  {
+    "name": "NYT Movies",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Movies.xml",
+    "section": "FILM + CULTURE",
+    "quality": 9
+  },
+  {
+    "name": "NYT Books",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Books.xml",
+    "section": "BOOKS + IDEAS",
+    "quality": 9
+  },
+  {
+    "name": "NYT Technology",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+    "section": "TECH + AI",
+    "quality": 9
+  },
+  {
+    "name": "Guardian Science",
+    "url": "https://www.theguardian.com/science/rss",
+    "section": "SCIENCE + NATURE",
+    "quality": 8
+  },
+  {
+    "name": "Guardian Culture",
+    "url": "https://www.theguardian.com/culture/rss",
+    "section": "FILM + CULTURE",
+    "quality": 8
+  },
+  {
+    "name": "Dezeen",
+    "url": "https://www.dezeen.com/feed/",
+    "section": "ART + DESIGN",
+    "quality": 8
+  },
+  {
+    "name": "Eater",
+    "url": "https://www.eater.com/rss/index.xml",
+    "section": "FOOD + TRAVEL",
+    "quality": 8
+  },
+  {
+    "name": "NASA",
+    "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "section": "SCIENCE + NATURE",
+    "quality": 9
+  }
+]
