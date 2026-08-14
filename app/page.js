@@ -1,5 +1,5 @@
 "use client";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 
 const FALLBACK = "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=1400&q=80";
 const BATCH_SIZE = 25;
@@ -9,11 +9,30 @@ function age(date) { if (!date) return "From the shelf"; const hours = (Date.now
 function Feedback({item, onRate}) { return <div className="controls" aria-label="Story feedback"><button onClick={() => onRate(item, "more")}>♡ More like this</button><button onClick={() => onRate(item, "less")}>Less</button><button onClick={() => onRate(item, "political")}>Too political</button><button onClick={() => onRate(item, "depressing")}>Too depressing</button></div>; }
 function RollingFact({label, children}) { return <div className="rollingFact"><b>{label}</b><span className="ticker"><i>{children}</i></span></div>; }
 function Story({item, index, onRate}) {
+  const tileRef = useRef(null);
   const type = item.format || "article";
   const [playing, setPlaying] = useState(false);
   const playable = type === "video" || type === "bandcamp";
   const playerUrl = type === "video" ? `https://www.youtube-nocookie.com/embed/${item.videoId}?autoplay=1&rel=0` : item.embedUrl;
-  return <article className={`tile tile-${type} tile-pattern-${index % 9} ${categoryClass(item.section)}`}>
+  useLayoutEffect(() => {
+    const tile = tileRef.current;
+    const cluster = tile?.closest(".tetrisCluster");
+    if (!tile || !cluster) return;
+    const fitToContent = () => {
+      const styles = getComputedStyle(cluster);
+      const row = parseFloat(styles.gridAutoRows) || 8;
+      const gap = parseFloat(styles.rowGap) || 10;
+      tile.style.gridRowEnd = "auto";
+      const height = tile.getBoundingClientRect().height;
+      tile.style.gridRowEnd = `span ${Math.max(1, Math.ceil((height + gap) / (row + gap)))}`;
+    };
+    const observer = new ResizeObserver(fitToContent);
+    observer.observe(tile);
+    tile.querySelectorAll("img").forEach(image => image.addEventListener("load", fitToContent));
+    fitToContent();
+    return () => observer.disconnect();
+  }, [item.canonicalUrl, playing]);
+  return <article ref={tileRef} className={`tile tile-${type} tile-pattern-${index % 9} ${categoryClass(item.section)}`}>
     {playable && playing ? <div className="inlinePlayer"><iframe src={playerUrl} title={item.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : item.image && (playable ? <button className="imageLink mediaTrigger" onClick={() => setPlaying(true)} aria-label={`Play ${item.title}`}><img src={item.image} alt="" onError={event => {event.currentTarget.src = FALLBACK;}} /><span className="play">▶</span></button> : <a className="imageLink" href={item.url} target="_blank" rel="noreferrer"><img src={item.image} alt="" onError={event => {event.currentTarget.src = FALLBACK;}} /></a>)}
     <div className="tileBody"><div className="kicker"><span>{item.section}</span><span>{type === "bandcamp" ? "New release" : type === "video" ? "Saved find" : age(item.date)}</span></div><h3><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></h3>{item.summary && type !== "visual" && <p>{item.summary.slice(0, type === "feature" ? 280 : 170)}</p>}<div className="meta">{item.source}</div><Feedback item={item} onRate={onRate}/></div>
   </article>;

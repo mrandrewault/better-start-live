@@ -39,3 +39,50 @@
 .tetrisCluster .tile-video{position:relative;min-height:120px;background:#111}.tetrisCluster .tile-video .imageLink{display:block!important;position:absolute;inset:0;width:100%;height:100%;z-index:0;flex:none}.tetrisCluster .tile-video .imageLink img{width:100%;height:100%;object-fit:cover}.tetrisCluster .tile-video .tileBody{position:absolute;z-index:2;inset:auto 0 0;padding:30px 13px 12px;background:linear-gradient(transparent,rgba(0,0,0,.9));color:#fff;pointer-events:none}.tetrisCluster .tile-video .kicker,.tetrisCluster .tile-video .meta,.tetrisCluster .tile-video h3{color:#fff;text-shadow:0 1px 4px #000}.tetrisCluster .tile-video h3{font:700 clamp(16px,1.65vw,25px)/1 "Space Grotesk",sans-serif;margin:6px 0}.tetrisCluster .tile-video .controls,.tetrisCluster .tile-video p{display:none!important}.tetrisCluster .tile-video .play{z-index:3}.tetrisCluster .tile-video .inlinePlayer{position:absolute;inset:0;width:100%;height:100%;z-index:4;flex:none}.tetrisCluster .tile-video .inlinePlayer iframe{width:100%;height:100%}
 .tetrisCluster .tile-pattern-0:not(.tile-video) h3{font:800 clamp(42px,5vw,72px)/.82 "Fraunces",serif;letter-spacing:-.065em}.tetrisCluster .tile-pattern-1:not(.tile-video) h3{font:700 16px/1.05 "Space Grotesk",sans-serif;text-transform:uppercase;letter-spacing:.01em}.tetrisCluster .tile-pattern-2:not(.tile-video) h3{font:italic 600 clamp(28px,3.5vw,52px)/.9 "DM Serif Display",serif}.tetrisCluster .tile-pattern-3:not(.tile-video) h3{font:700 19px/1.05 "DM Sans",sans-serif}.tetrisCluster .tile-pattern-4:not(.tile-video) h3{font:800 clamp(38px,5vw,72px)/.84 "Fraunces",serif;letter-spacing:-.055em}.tetrisCluster .tile-pattern-5:not(.tile-video) h3{font:500 16px/1.1 "Space Grotesk",sans-serif}.tetrisCluster .tile-pattern-6:not(.tile-video) h3{font:600 clamp(26px,3vw,48px)/.92 "DM Serif Display",serif}.tetrisCluster .tile-pattern-7:not(.tile-video) h3{font:800 21px/.98 "Fraunces",serif;text-transform:uppercase}.tetrisCluster .tile-pattern-8:not(.tile-video) h3{font:700 clamp(20px,2.2vw,34px)/.94 "Space Grotesk",sans-serif}.tetrisCluster .tile-pattern-4{border-width:3px}.tetrisCluster .tile-pattern-6{box-shadow:7px 7px 0 color-mix(in srgb,var(--accent) 28%,transparent)}.tetrisCluster .tile-pattern-8 .tileBody{background:color-mix(in srgb,var(--accent) 7%,var(--card))}
 @media(max-width:650px){.clusterVariant-1 .tile:nth-child(n),.clusterVariant-2 .tile:nth-child(n){grid-column:auto;grid-row:auto}.clusterVariant-1 .tile:nth-child(4n+1),.clusterVariant-2 .tile:nth-child(4n+1){grid-column:1/-1}.tetrisCluster .tile-pattern-0:not(.tile-video) h3,.tetrisCluster .tile-pattern-4:not(.tile-video) h3{font-size:45px}}
+
+/* V11: wild composition with non-negotiable fit and legibility constraints. */
+.tetrisCluster,.tetrisCluster.partialCluster{grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:8px;grid-auto-flow:dense;align-items:start;gap:10px;margin-bottom:10px}
+.tetrisCluster .tile:nth-child(n),.clusterVariant-1 .tile:nth-child(n),.clusterVariant-2 .tile:nth-child(n){grid-row:auto;align-self:start;height:max-content;min-height:0;overflow:visible}
+.tetrisCluster .tile:nth-child(1),.tetrisCluster .tile:nth-child(7){grid-column:span 5}
+.tetrisCluster .tile:nth-child(2),.tetrisCluster .tile:nth-child(6),.tetrisCluster .tile:nth-child(9){grid-column:span 3}
+.tetrisCluster .tile:nth-child(3),.tetrisCluster .tile:nth-child(4),.tetrisCluster .tile:nth-child(5),.tetrisCluster .tile:nth-child(8),.tetrisCluster .tile:nth-child(10){grid-column:span 4}
+.clusterVariant-1 .tile:nth-child(1),.clusterVariant-1 .tile:nth-child(7){grid-column:span 4}
+.clusterVariant-1 .tile:nth-child(3),.clusterVariant-1 .tile:nth-child(8){grid-column:span 5}
+.clusterVariant-2 .tile:nth-child(1),.clusterVariant-2 .tile:nth-child(6){grid-column:span 6}
+.clusterVariant-2 .tile:nth-child(2),.clusterVariant-2 .tile:nth-child(7){grid-column:span 4}
+.clusterVariant-2 .tile:nth-child(3),.clusterVariant-2 .tile:nth-child(8){grid-column:span 2}
+.tetrisCluster .tileBody{overflow:visible;flex:none}
+.tetrisCluster .tile:nth-child(n) .imageLink{display:block}
+.tetrisCluster .tile:nth-child(n) p{display:block}
+.tetrisCluster .tile:nth-child(5) .controls,.tetrisCluster .tile:nth-child(9) .controls{display:flex}
+.tetrisCluster .imageLink{flex:none;width:100%;overflow:hidden}
+.tetrisCluster .tile-article .imageLink img{height:auto;aspect-ratio:16/9;object-fit:cover}
+.tetrisCluster .tile-feature .imageLink img{height:auto;aspect-ratio:4/3;object-fit:cover}
+.tetrisCluster .tile-visual .imageLink img,.tetrisCluster .tile-bandcamp .imageLink img{height:auto;aspect-ratio:1;object-fit:cover}
+.tetrisCluster .tile h3{overflow-wrap:anywhere;text-wrap:balance}
+.tetrisCluster .tile-pattern-0:not(.tile-video) h3{font-size:clamp(30px,3.7vw,58px);line-height:.9}
+.tetrisCluster .tile-pattern-2:not(.tile-video) h3{font-size:clamp(25px,3vw,46px);line-height:.94}
+.tetrisCluster .tile-pattern-4:not(.tile-video) h3{font-size:clamp(29px,3.6vw,56px);line-height:.9}
+.tetrisCluster .tile-pattern-6:not(.tile-video) h3{font-size:clamp(24px,2.8vw,42px);line-height:.96}
+.tetrisCluster .tile-pattern-8:not(.tile-video) h3{font-size:clamp(20px,2vw,31px);line-height:1}
+.tetrisCluster .tile-video{grid-column:span 5!important;aspect-ratio:16/9;height:auto!important;min-height:0;overflow:hidden!important;background:#111}
+.tetrisCluster .tile-video .imageLink{position:absolute;inset:0;width:100%;height:100%;background:#111}
+.tetrisCluster .tile-video .imageLink img{width:100%;height:100%;aspect-ratio:auto;object-fit:contain;background:#111;transform:none}
+.tetrisCluster .tile-video .tileBody{max-height:58%;overflow:hidden;padding:42px 14px 12px;background:linear-gradient(transparent,rgba(0,0,0,.92))}
+.tetrisCluster .tile-video h3{font-size:clamp(15px,1.5vw,23px);line-height:1.03;overflow-wrap:normal}
+.tetrisCluster .tile-video .kicker span:last-child{display:none}
+@media(max-width:900px){.tetrisCluster,.tetrisCluster.partialCluster{grid-template-columns:repeat(8,minmax(0,1fr));grid-auto-rows:8px}.tetrisCluster .tile:nth-child(n){grid-column:span 4}.tetrisCluster .tile:nth-child(3n+1){grid-column:span 5}.tetrisCluster .tile:nth-child(3n+2){grid-column:span 3}.tetrisCluster .tile-video{grid-column:span 5!important}}
+@media(max-width:650px){.tetrisCluster,.tetrisCluster.partialCluster{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:8px}.tetrisCluster .tile:nth-child(n){grid-column:span 1;min-height:0}.tetrisCluster .tile:nth-child(4n+1){grid-column:1/-1;min-height:0}.tetrisCluster .tile-video{grid-column:1/-1!important}.tetrisCluster .tile-pattern-0:not(.tile-video) h3,.tetrisCluster .tile-pattern-4:not(.tile-video) h3{font-size:clamp(27px,10vw,42px)}.tetrisCluster .tile:nth-child(n) p{display:none}.tetrisCluster .tile:nth-child(4n+1) p{display:block}}
+
+/* Compatible widths prevent the dense grid from stranding large blank channels. */
+@media(min-width:901px){
+  .tetrisCluster,.tetrisCluster.partialCluster{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .tetrisCluster .tile:nth-child(n){grid-column:span 2}
+  .tetrisCluster .tile:nth-child(1),.tetrisCluster .tile:nth-child(2),.tetrisCluster .tile:nth-child(6),.tetrisCluster .tile:nth-child(7){grid-column:span 3}
+  .clusterVariant-1 .tile:nth-child(n),.clusterVariant-2 .tile:nth-child(n){grid-column:span 2}
+  .clusterVariant-1 .tile:nth-child(2),.clusterVariant-1 .tile:nth-child(5),.clusterVariant-1 .tile:nth-child(8),.clusterVariant-1 .tile:nth-child(9),.clusterVariant-2 .tile:nth-child(1),.clusterVariant-2 .tile:nth-child(4),.clusterVariant-2 .tile:nth-child(6),.clusterVariant-2 .tile:nth-child(10){grid-column:span 3}
+  .tetrisCluster .tile-video{grid-column:span 3!important}
+}
+
+/* Equal packing units behave like a masonry wall; shape variation comes from content height. */
+@media(min-width:901px){.tetrisCluster .tile:nth-child(n),.clusterVariant-1 .tile:nth-child(n),.clusterVariant-2 .tile:nth-child(n),.tetrisCluster .tile-video{grid-column:span 2!important}}
