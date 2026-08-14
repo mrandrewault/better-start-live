@@ -77,7 +77,7 @@ function unique(items) {
 
 // A greedy magazine editor: every choice is judged by how much it improves the
 // current page, with diminishing returns for repeated sources/topics/formats.
-function compose(candidates, count, seed = {}) {
+function compose(candidates, count, seed = {}, random = Math.random) {
   const chosen = [], sourceCounts = {...seed.sources}, topicCounts = {...seed.topics}, formatCounts = {...seed.formats};
   const pool = [...candidates];
   while (chosen.length < count && pool.length) {
@@ -90,7 +90,7 @@ function compose(candidates, count, seed = {}) {
       const visualBonus = item.image && !(formatCounts.visual || 0) ? 12 : 0;
       const serendipityBonus = item.interestHits === 0 && chosen.length > 3 ? 5 : 0;
       const moodBonus = /discover|new|beautiful|guide|best|love|return|release|photo|album/i.test(`${item.title} ${item.summary}`) ? 4 : 0;
-      const compositionScore = item.score - sourcePenalty - topicPenalty - formatPenalty + visualBonus + serendipityBonus + moodBonus + Math.random() * 0.01;
+      const compositionScore = item.score - sourcePenalty - topicPenalty - formatPenalty + visualBonus + serendipityBonus + moodBonus + random() * 14;
       if (compositionScore > best) { best = compositionScore; winner = index; }
     });
     const [item] = pool.splice(winner, 1); chosen.push(item);
@@ -176,7 +176,14 @@ async function loadInstagramProfile() {
   } catch { return null; }
 }
 
-export async function GET() {
+function seededRandom(value = "better-start") {
+  let state = 2166136261;
+  for (let index = 0; index < value.length; index++) state = Math.imul(state ^ value.charCodeAt(index), 16777619);
+  return () => { state += 0x6D2B79F5; let result = state; result = Math.imul(result ^ result >>> 15, result | 1); result ^= result + Math.imul(result ^ result >>> 7, result | 61); return ((result ^ result >>> 14) >>> 0) / 4294967296; };
+}
+
+export async function GET(request) {
+  const random = seededRandom(new URL(request.url).searchParams.get("visit") || String(Math.floor(Date.now() / 72e5)));
   const taste = load("taste.json"), sources = load("sources.json"), favorites = load("favorites.json");
   const results = await Promise.allSettled(sources.map(async source => {
     const feed = await parser.parseURL(source.url);
@@ -208,16 +215,16 @@ export async function GET() {
   });
   const ribbonFavorite = claim(favoriteItems.slice(0, 1))[0] || null;
   const favoriteSelection = claim(favoriteItems).slice(0, 6);
-  const goodNews = claim(compose(all.filter(isGoodNews), 1))[0] || null;
+  const goodNews = claim(compose(all.filter(isGoodNews), 1, {}, random))[0] || null;
   const [youtubeItems, bandcampItems] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases()]);
   const mediaPool = unique([...bandcampItems, ...youtubeItems]);
-  const media = claim(compose(mediaPool, 20));
+  const media = claim(compose(mediaPool, 20, {}, random));
   const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));
-  const important = claim(compose(importantPool, 3));
+  const important = claim(compose(importantPool, 3, {}, random));
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
-  const gallery = claim(compose(galleryPool, 140));
+  const gallery = claim(compose(galleryPool, 140, {}, random));
   const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && isJoyful(item) && !usedUrls.has(canonicalUrl(item.url)));
-  const serendipity = claim(compose(serendipityPool, 60));
+  const serendipity = claim(compose(serendipityPool, 60, {}, random));
 
-  return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, goodNews, favorites: favoriteSelection, media, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
+  return Response.json({generatedAt: new Date().toISOString(), edition: Math.floor(Date.now() / 72e5), ribbonFavorite, goodNews, favorites: favoriteSelection, media, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "no-store"}});
 }
