@@ -100,12 +100,11 @@ function compose(candidates, count, seed = {}, random = Math.random) {
   }
   return chosen;
 }
-function playlistFeature() {
+function playlistFeature(random = Math.random, avoid = new Set()) {
   const files = fs.readdirSync(dataPath(".")).filter(name => name.endsWith("-videos.csv"));
   if (!files.length) return null;
-  const day = Math.floor(Date.now() / 86400000);
-  const file = files[day % files.length], rows = fs.readFileSync(dataPath(file), "utf8").trim().split(/\r?\n/).slice(1);
-  const videoId = rows[(day * 7) % rows.length]?.split(",")[0];
+  const file = files[Math.floor(random() * files.length)], rows = fs.readFileSync(dataPath(file), "utf8").trim().split(/\r?\n/).slice(1).map(row => row.split(",")[0]).filter(id => id && !avoid.has(id));
+  const videoId = rows[Math.floor(random() * rows.length)];
   if (!videoId) return null;
   const playlist = file.replace(/-videos\.csv$/, "");
   return {title: `A video from Andrew's ${playlist} shelf`, url: `https://www.youtube.com/watch?v=${videoId}`, source: "YouTube library", section: /camera/i.test(playlist) ? "PHOTOGRAPHY" : "MUSIC", summary: `A daily find from the existing ${playlist} playlist.`, date: null, image: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, score: 52, interestHits: 1, noHits: 0, videoId, format: "video"};
@@ -132,13 +131,12 @@ async function loadYouTubeDiscoveries() {
   const items = []; results.forEach(result => { if (result.status === "fulfilled") items.push(...result.value); });
   return items.filter(item => item.videoId && !isDisallowed(item) && isJoyful(item)).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 }
-async function loadPlaylistDiscoveries() {
+async function loadPlaylistDiscoveries(random = Math.random, avoid = new Set()) {
   const preferred = ["funny shit-videos.csv", "Movie clips-videos.csv", "Film Class-videos.csv", "Favorites-videos.csv", "Blue Notes-videos.csv", "Synth-videos.csv", "GD-videos.csv", "Camera-videos.csv", "Concerts-videos.csv"];
-  const day = Math.floor(Date.now() / 86400000), picks = [];
-  preferred.forEach((file, index) => {
-    const rows = fs.readFileSync(dataPath(file), "utf8").trim().split(/\r?\n/).slice(1);
-    const videoId = rows[(day * (index + 3)) % rows.length]?.split(",")[0];
-    if (videoId) picks.push({videoId, shelf: file.replace(/-videos\.csv$/, "")});
+  const picks = [];
+  preferred.forEach(file => {
+    const rows = fs.readFileSync(dataPath(file), "utf8").trim().split(/\r?\n/).slice(1).map(row => row.split(",")[0]).filter(id => id && !avoid.has(id));
+    for (let pick = 0; pick < 2 && rows.length; pick++) { const index = Math.floor(random() * rows.length), [videoId] = rows.splice(index, 1); picks.push({videoId, shelf: file.replace(/-videos\.csv$/, "")}); }
   });
   const results = await Promise.allSettled(picks.map(async pick => {
     const url = `https://www.youtube.com/watch?v=${pick.videoId}`;
@@ -183,7 +181,7 @@ function seededRandom(value = "better-start") {
 }
 
 export async function GET(request) {
-  const random = seededRandom(new URL(request.url).searchParams.get("visit") || String(Math.floor(Date.now() / 72e5)));
+  const params = new URL(request.url).searchParams, random = seededRandom(params.get("visit") || String(Math.floor(Date.now() / 72e5))), avoidVideos = new Set((params.get("avoid") || "").split(",").filter(Boolean));
   const taste = load("taste.json"), sources = load("sources.json"), favorites = load("favorites.json");
   const results = await Promise.allSettled(sources.map(async source => {
     const feed = await parser.parseURL(source.url);
@@ -195,7 +193,7 @@ export async function GET(request) {
   }));
   let all = [];
   results.forEach(result => { if (result.status === "fulfilled") all.push(...result.value); });
-  const video = playlistFeature(); if (video) all.push(video);
+  const video = playlistFeature(random, avoidVideos); if (video) all.push(video);
   all = unique(all.filter(item => item.score > 18 && !isDisallowed(item) && isJoyful(item) && isFreshLocal(item)).sort((a, b) => b.score - a.score));
 
   const favoriteResults = await Promise.allSettled(favorites.map(async favorite => {
@@ -216,7 +214,7 @@ export async function GET(request) {
   const ribbonFavorite = claim(favoriteItems.slice(0, 1))[0] || null;
   const favoriteSelection = claim(favoriteItems).slice(0, 6);
   const goodNews = claim(compose(all.filter(isGoodNews), 1, {}, random))[0] || null;
-  const [youtubeItems, bandcampItems] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases()]);
+  const [youtubeItems, bandcampItems] = await Promise.all([loadPlaylistDiscoveries(random, avoidVideos), loadBandcampReleases()]);
   const mediaPool = unique([...bandcampItems, ...youtubeItems]);
   const media = claim(compose(mediaPool, 20, {}, random));
   const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));

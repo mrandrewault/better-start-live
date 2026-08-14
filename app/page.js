@@ -5,6 +5,7 @@ const FALLBACK = "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?a
 const BATCH_SIZE = 25;
 const SERENDIPITY_BATCH_SIZE = 9;
 const EDITION_MS = 2 * 60 * 60 * 1000;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const categoryClass = section => `cat-${(section || "news").toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
 const arrangeForFrames = items => {
   const arranged = [...items];
@@ -31,15 +32,42 @@ const blendPool = (previous = [], next = []) => {
 const prepareEdition = (next, previous, preserve) => ({...next, gallery: preserve ? blendPool(previous?.gallery, next.gallery) : prioritizeUnseen(next.gallery), media: preserve ? blendPool(previous?.media, next.media) : prioritizeUnseen(next.media), serendipity: preserve ? blendPool(previous?.serendipity, next.serendipity) : prioritizeUnseen(next.serendipity)});
 function Feedback({item, onRate, onSave, onShare, saved}) { return <div className="controls" aria-label="Story feedback"><button onClick={() => onRate(item, "more")}>♡ More like this</button><button className={saved ? "savedControl" : ""} onClick={() => onSave(item)}>{saved ? "Saved ✓" : "Save"}</button><button onClick={() => onShare(item)}>Share</button><button onClick={() => onRate(item, "less")}>Less</button><button onClick={() => onRate(item, "political")}>Too political</button><button onClick={() => onRate(item, "depressing")}>Too depressing</button></div>; }
 function RollingFact({label, children}) { return <div className="rollingFact"><b>{label}</b><span className="ticker"><i>{children}</i></span></div>; }
-const JOY_TYPES = ["chime", "question", "ripple"];
+const JOY_TYPES = ["chime", "question", "ripple", "doodle"];
 const QUESTIONS = [
   {question: "Which animal has fingerprints so similar to ours that they can confuse investigators?", answer: "The koala. Its fingerprints have loops and whorls remarkably like human ones."},
   {question: "What color was the Statue of Liberty when it first arrived in New York?", answer: "Copper-brown. Its familiar green patina formed gradually through oxidation."},
   {question: "Which planet would float if you could place it in an unimaginably large bathtub?", answer: "Saturn. Its average density is lower than water’s."},
   {question: "What everyday musical instrument contains more than 12,000 individual parts?", answer: "A grand piano—an intricate little city of wood, felt, wire and metal."},
   {question: "What is a group of flamingos called?", answer: "A flamboyance, which seems exactly right."},
-  {question: "Which fruit carries its seeds on the outside?", answer: "The strawberry. Each apparent seed is technically its own tiny fruit."}
+  {question: "Which fruit carries its seeds on the outside?", answer: "The strawberry. Each apparent seed is technically its own tiny fruit."},
+  {question: "Which sea creature has three hearts?", answer: "The octopus—two hearts serve the gills and one circulates blood through the body."},
+  {question: "What is the tiny plastic tip at the end of a shoelace called?", answer: "An aglet. It keeps the lace from fraying and makes threading much easier."},
+  {question: "Which bird can fly backward?", answer: "The hummingbird, thanks to shoulder joints that let its wings rotate almost completely."},
+  {question: "What was the first toy advertised on television?", answer: "Mr. Potato Head, in 1952."},
+  {question: "Which country has more bicycles than people?", answer: "The Netherlands—bicycles comfortably outnumber residents."},
+  {question: "What is the smell after rain called?", answer: "Petrichor, a word assembled from Greek roots for stone and the fluid of the gods."},
+  {question: "Which mammal sleeps while holding hands so it won’t drift away?", answer: "Sea otters often hold paws while resting together in floating groups called rafts."},
+  {question: "How long is a day on Venus compared with its year?", answer: "A Venusian day is longer: about 243 Earth days, while its year lasts about 225."},
+  {question: "Which common kitchen ingredient can remain edible for thousands of years?", answer: "Honey. Sealed honey resists spoilage because it is acidic and contains very little water."},
+  {question: "What do you call the dot above a lowercase i or j?", answer: "A tittle—a tiny word for a tiny typographic detail."},
+  {question: "Which animal makes a cube-shaped dropping?", answer: "The wombat. Its unusually shaped intestines create remarkably stackable cubes."},
+  {question: "What is the world’s largest living structure?", answer: "Australia’s Great Barrier Reef, built by countless tiny coral polyps."},
+  {question: "Which instrument was played in space before any other?", answer: "The harmonica, played aboard Gemini 6 in 1965."},
+  {question: "What color is an airplane’s so-called black box?", answer: "Bright orange, so it is easier to locate."},
+  {question: "Which tree produces the world’s largest seed?", answer: "The coco de mer palm. A single seed can weigh more than 35 pounds."},
+  {question: "What is a group of porcupines called?", answer: "A prickle—another collective noun that knew exactly what it was doing."},
+  {question: "Which famous landmark grows slightly taller in summer?", answer: "The Eiffel Tower expands in the heat and can gain around six inches."},
+  {question: "What does a cloud weigh?", answer: "A typical cumulus cloud can weigh around a million pounds, held aloft by dispersed droplets and rising air."}
 ];
+const recentHistory = key => JSON.parse(localStorage.getItem(key) || "[]").filter(entry => Date.now() - entry.ts < WEEK_MS);
+const chooseJoy = (type, edition, bench, history) => {
+  const count = type === "question" ? QUESTIONS.length : 32, start = Math.abs(edition * 7 + bench * 11) % count;
+  const recent = new Set(history.map(entry => entry.signature));
+  for (let offset = 0; offset < count; offset++) { const variant = (start + offset) % count, signature = `${type}-${variant}`; if (!recent.has(signature)) return {variant, signature}; }
+  const oldest = history.filter(entry => entry.signature.startsWith(`${type}-`)).sort((a, b) => a.ts - b.ts)[0];
+  const variant = oldest ? Number(oldest.signature.split("-").pop()) : start;
+  return {variant, signature: `${type}-${variant}`};
+};
 function playJoyTone(frequency) {
   const Audio = window.AudioContext || window.webkitAudioContext;
   if (!Audio) return;
@@ -47,15 +75,29 @@ function playJoyTone(frequency) {
   const oscillator = context.createOscillator(), gain = context.createGain();
   oscillator.type = "sine"; oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.0001, context.currentTime); gain.gain.exponentialRampToValueAtTime(.16, context.currentTime + .015); gain.gain.exponentialRampToValueAtTime(.0001, context.currentTime + .65); oscillator.connect(gain).connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + .7);
 }
+function PocketEtch({variant}) {
+  const canvasRef = useRef(null), drawing = useRef(false), [width, setWidth] = useState(4), [message, setMessage] = useState("Draw with mouse, finger, or right-click");
+  const palettes = [["#f8ead1", "#263d38"], ["#dceeff", "#2457b8"], ["#ffe0da", "#8b2f3e"], ["#e6f0d8", "#385b32"], ["#20231f", "#f2cf4a"], ["#f1e4ff", "#633d91"]], [paper, ink] = palettes[variant % palettes.length];
+  const setup = () => { const canvas = canvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(), ratio = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.max(1, rect.width * ratio); canvas.height = Math.max(1, rect.height * ratio); const context = canvas.getContext("2d"); context.scale(ratio, ratio); context.fillStyle = paper; context.fillRect(0, 0, rect.width, rect.height); context.lineCap = "round"; context.lineJoin = "round"; };
+  useEffect(() => { setup(); const observer = new ResizeObserver(setup); if (canvasRef.current) observer.observe(canvasRef.current); return () => observer.disconnect(); }, [paper]);
+  const point = event => { const rect = event.currentTarget.getBoundingClientRect(); return {x: event.clientX - rect.left, y: event.clientY - rect.top}; };
+  const start = event => { event.preventDefault(); drawing.current = true; event.currentTarget.setPointerCapture?.(event.pointerId); const canvas = canvasRef.current, context = canvas.getContext("2d"), spot = point(event); context.strokeStyle = ink; context.fillStyle = ink; context.lineWidth = width; context.beginPath(); context.arc(spot.x, spot.y, width / 2, 0, Math.PI * 2); context.fill(); context.beginPath(); context.moveTo(spot.x, spot.y); setMessage("A tiny masterpiece is happening"); };
+  const move = event => { if (!drawing.current) return; event.preventDefault(); const context = canvasRef.current.getContext("2d"), spot = point(event); context.strokeStyle = ink; context.lineWidth = width; context.lineTo(spot.x, spot.y); context.stroke(); };
+  const stop = () => { drawing.current = false; };
+  const erase = () => { setup(); setMessage("Clean slate. Goof around again."); };
+  const shareDoodle = () => canvasRef.current?.toBlob(async blob => { if (!blob) return; const file = new File([blob], "better-start-doodle.png", {type: "image/png"}), text = "I made this little doodle on Better Start—rage-free news, information and good times."; try { if (navigator.canShare?.({files: [file]})) await navigator.share({files: [file], title: "My Better Start doodle", text}); else { const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = file.name; link.click(); URL.revokeObjectURL(link.href); setMessage("Doodle downloaded—ready to send to a pal."); } } catch {} }, "image/png");
+  return <div className="joyBody doodleBody" style={{"--doodle-paper": paper, "--doodle-ink": ink}}><div className="joyTop"><span>JOY BREAK · POCKET ETCH</span><span>{message}</span></div><canvas ref={canvasRef} aria-label="Pocket Etch drawing canvas" onContextMenu={event => event.preventDefault()} onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} /><div className="doodleTools"><div><button className={width === 2 ? "active" : ""} onClick={() => setWidth(2)}>Pencil</button><button className={width === 4 ? "active" : ""} onClick={() => setWidth(4)}>Marker</button><button className={width === 8 ? "active" : ""} onClick={() => setWidth(8)}>Crayon</button></div><div><button onClick={erase}>Shake it clean</button><button onClick={shareDoodle}>Share my doodle</button></div></div></div>;
+}
 function JoyTile({item, index}) {
   const [revealed, setRevealed] = useState(false), [muted, setMuted] = useState(false), [ripples, setRipples] = useState([]);
-  const colors = ["#ff5a4f", "#f4be3f", "#49a36f", "#377bd4", "#9166c9"], palettes = [[261.63, 329.63, 392, 493.88, 523.25], [220, 277.18, 329.63, 415.3, 440], [293.66, 349.23, 440, 523.25, 587.33]], notes = palettes[(item.edition + index) % palettes.length];
+  const hue = item.variant * 37 % 360, colors = Array.from({length: 5}, (_, color) => `hsl(${(hue + color * 58) % 360} 72% 58%)`), roots = [196, 220, 246.94, 261.63, 293.66, 329.63], root = roots[item.variant % roots.length], ratios = [1, 1.25, 1.5, 1.875, 2], notes = ratios.map(ratio => root * ratio);
   const addRipple = event => { const rect = event.currentTarget.getBoundingClientRect(), id = Date.now(); setRipples(current => [...current.slice(-7), {id, x: event.clientX - rect.left, y: event.clientY - rect.top, color: colors[(current.length + item.edition) % colors.length]}]); setTimeout(() => setRipples(current => current.filter(ripple => ripple.id !== id)), 900); };
-  const question = QUESTIONS[(item.edition + index) % QUESTIONS.length];
-  return <article className={`tile tile-joy joy-${item.joyType} tile-pattern-${index % 9}`}>
+  const question = QUESTIONS[item.variant % QUESTIONS.length];
+  return <article className={`tile tile-joy joy-${item.joyType} tile-pattern-${index % 9}`} data-joy-signature={item.signature}>
     {item.joyType === "chime" && <div className="joyBody chimeBody"><div className="joyTop"><span>JOY BREAK · COLOR CHIME</span><button onClick={() => setMuted(value => !value)} aria-label={muted ? "Turn sound on" : "Mute sound"}>{muted ? "Sound off" : "Sound on"}</button></div><h3>Tap a color.<br/>Make the morning ring.</h3><div className="chimeKeys">{colors.map((color, note) => <button key={color} style={{"--key": color}} onClick={() => !muted && playJoyTone(notes[note])} aria-label={`Play note ${note + 1}`}><i /></button>)}</div><p>No score. No song to finish. Just five nice sounds.</p></div>}
     {item.joyType === "question" && <div className="joyBody questionBody"><div className="joyTop"><span>ONE DELIGHTFUL QUESTION</span><span>?</span></div><h3>{question.question}</h3>{revealed ? <p className="joyAnswer">{question.answer}</p> : <button className="revealButton" onClick={() => setRevealed(true)}>Reveal the delightful answer <span>→</span></button>}</div>}
     {item.joyType === "ripple" && <button className="joyBody rippleBody" onPointerDown={addRipple} aria-label="Make colorful ripples"><div className="joyTop"><span>JOY BREAK · RIPPLE CANVAS</span><span>Touch anywhere</span></div><h3>Leave a little color behind.</h3>{ripples.map(ripple => <i className="joyRipple" key={ripple.id} style={{left: ripple.x, top: ripple.y, "--ripple": ripple.color}} />)}<small>Tap · tap · tap</small></button>}
+    {item.joyType === "doodle" && <PocketEtch variant={item.variant} />}
   </article>;
 }
 function Story({item, index, onRate, onSave, onShare, saved}) {
@@ -91,13 +133,13 @@ function Story({item, index, onRate, onSave, onShare, saved}) {
 }
 
 export default function Home() {
-  const [data, setData] = useState(null), [weather, setWeather] = useState(null), [batches, setBatches] = useState(1), [serendipityCount, setSerendipityCount] = useState(3), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date()), [saved, setSaved] = useState([]), [showSaved, setShowSaved] = useState(false), [editionNote, setEditionNote] = useState("Composing edition");
+  const [data, setData] = useState(null), [weather, setWeather] = useState(null), [batches, setBatches] = useState(1), [serendipityCount, setSerendipityCount] = useState(3), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date()), [saved, setSaved] = useState([]), [showSaved, setShowSaved] = useState(false), [editionNote, setEditionNote] = useState("Composing edition"), [joyHistory, setJoyHistory] = useState([]);
   useEffect(() => {
-    setSaved(JSON.parse(localStorage.getItem("betterStartSaved") || "[]"));
+    setSaved(JSON.parse(localStorage.getItem("betterStartSaved") || "[]")); setJoyHistory(recentHistory("betterStartJoyHistory"));
     let lastLoad = Date.now();
     const loadEdition = async preserve => {
-      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`;
-      try { const next = await (await fetch(`/api/feed?visit=${encodeURIComponent(visit)}`, {cache: "no-store"})).json(); setData(previous => prepareEdition(next, previous, preserve)); setEditionNote(`${preserve ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})} edition`); lastLoad = Date.now(); } catch {}
+      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`, mediaHistory = recentHistory("betterStartMediaHistory"), avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(",");
+      try { const next = await (await fetch(`/api/feed?visit=${encodeURIComponent(visit)}&avoid=${encodeURIComponent(avoid)}`, {cache: "no-store"})).json(); setJoyHistory(recentHistory("betterStartJoyHistory")); setData(previous => prepareEdition(next, previous, preserve)); setEditionNote(`${preserve ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})} edition`); lastLoad = Date.now(); } catch {}
     };
     loadEdition(false);
     fetch("/api/weather").then(response => response.json()).then(setWeather).catch(() => {});
@@ -108,9 +150,9 @@ export default function Home() {
   }, []);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const date = now.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
-  const wall = useMemo(() => { const stories = [...(data?.gallery || [])], media = [...(data?.media || [])], mixed = []; while (stories.length || media.length) { mixed.push(...stories.splice(0, 3)); if (media.length) mixed.push(media.shift()); } const result = [], pool = [...mixed], lastSeen = new Map(); while (pool.length) { const recent = result.slice(-20).map(item => item.source); let index = pool.findIndex(item => !recent.includes(item.source)); if (index < 0) { let oldest = Infinity; pool.forEach((item, candidate) => { const seen = lastSeen.get(item.source) ?? -Infinity; if (seen < oldest) { oldest = seen; index = candidate; } }); } const item = pool.splice(Math.max(0, index), 1)[0]; lastSeen.set(item.source, result.length); result.push(item); } const edition = data?.edition || 0, joyful = []; for (let start = 0, bench = 0; start < result.length; start += 24, bench++) { const group = result.slice(start, start + 24), position = Math.min(group.length, 6 + bench % 5); group.splice(position, 0, {format: "joy", joyType: JOY_TYPES[(edition + bench) % JOY_TYPES.length], edition, title: "A small Better Start joy break", source: "Better Start Joy Bench", section: "JOY", canonicalUrl: `joy-${edition}-${bench}`, url: `#joy-${edition}-${bench}`}); joyful.push(...group); } return joyful; }, [data]);
+  const wall = useMemo(() => { const stories = [...(data?.gallery || [])], media = [...(data?.media || [])], mixed = []; while (stories.length || media.length) { mixed.push(...stories.splice(0, 3)); if (media.length) mixed.push(media.shift()); } const result = [], pool = [...mixed], lastSeen = new Map(); while (pool.length) { const recent = result.slice(-20).map(item => item.source); let index = pool.findIndex(item => !recent.includes(item.source)); if (index < 0) { let oldest = Infinity; pool.forEach((item, candidate) => { const seen = lastSeen.get(item.source) ?? -Infinity; if (seen < oldest) { oldest = seen; index = candidate; } }); } const item = pool.splice(Math.max(0, index), 1)[0]; lastSeen.set(item.source, result.length); result.push(item); } const edition = data?.edition || 0, joyful = [], reserved = [...joyHistory]; for (let start = 0, bench = 0; start < result.length; start += 24, bench++) { const group = result.slice(start, start + 24), position = Math.min(group.length, 6 + bench % 5), joyType = JOY_TYPES[(edition + bench) % JOY_TYPES.length], choice = chooseJoy(joyType, edition, bench, reserved); reserved.push({signature: choice.signature, ts: Date.now()}); group.splice(position, 0, {format: "joy", joyType, variant: choice.variant, signature: choice.signature, edition, title: "A small Better Start joy break", source: "Better Start Joy Bench", section: "JOY", canonicalUrl: `joy-${edition}-${bench}-${choice.signature}`, url: `#joy-${edition}-${bench}`}); joyful.push(...group); } return joyful; }, [data, joyHistory]);
   const visibleBatches = useMemo(() => Array.from({length: batches}, (_, index) => wall.slice(index * BATCH_SIZE, (index + 1) * BATCH_SIZE)).filter(batch => batch.length), [wall, batches]);
-  useEffect(() => { if (!wall.length) return; const seen = JSON.parse(localStorage.getItem("betterStartSeen") || "[]"), combined = [...new Set([...seen, ...wall.slice(0, batches * BATCH_SIZE).map(itemKey)])].slice(-800); localStorage.setItem("betterStartSeen", JSON.stringify(combined)); }, [wall, batches]);
+  useEffect(() => { if (!wall.length) return; const visible = wall.slice(0, batches * BATCH_SIZE), seen = JSON.parse(localStorage.getItem("betterStartSeen") || "[]"), combined = [...new Set([...seen, ...visible.map(itemKey)])].slice(-800), nowSeen = Date.now(); localStorage.setItem("betterStartSeen", JSON.stringify(combined)); const media = recentHistory("betterStartMediaHistory"), mediaIds = new Set(media.map(entry => entry.id)); visible.filter(item => item.videoId && !mediaIds.has(item.videoId)).forEach(item => media.push({id: item.videoId, ts: nowSeen})); localStorage.setItem("betterStartMediaHistory", JSON.stringify(media.slice(-300))); const joy = recentHistory("betterStartJoyHistory"), joyIds = new Set(joy.map(entry => entry.signature)); visible.filter(item => item.signature && !joyIds.has(item.signature)).forEach(item => joy.push({signature: item.signature, ts: nowSeen})); localStorage.setItem("betterStartJoyHistory", JSON.stringify(joy.slice(-300))); }, [wall, batches]);
   const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartFeedback", JSON.stringify(ratings.slice(-250))); };
   const toggleSave = item => setSaved(current => { const exists = current.some(savedItem => itemKey(savedItem) === itemKey(item)), next = exists ? current.filter(savedItem => itemKey(savedItem) !== itemKey(item)) : [{...item, savedAt: Date.now()}, ...current]; localStorage.setItem("betterStartSaved", JSON.stringify(next.slice(0, 200))); return next.slice(0, 200); });
   const share = async item => { const text = `I found this on Better Start — rage-free news, information and good times.\n\n${item.title}`, params = new URLSearchParams({u: item.url, t: item.title, s: item.source || "", c: item.section || ""}); if (item.image) params.set("i", item.image); const shareUrl = `${location.origin}/share?${params}`; try { if (navigator.share) await navigator.share({title: `${item.title} — Better Start`, text, url: shareUrl}); else { await navigator.clipboard.writeText(`${text}\n${shareUrl}`); setEditionNote("Branded share link copied"); } } catch {} };
