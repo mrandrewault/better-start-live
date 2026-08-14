@@ -211,7 +211,7 @@ export async function GET() {
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
   const gallery = claim(compose(galleryPool, 140));
   const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && isJoyful(item) && !usedUrls.has(canonicalUrl(item.url)));
-  const serendipity = claim(compose(serendipityPool, 3));
+  const serendipity = claim(compose(serendipityPool, 60));
 
   return Response.json({generatedAt: new Date().toISOString(), ribbonFavorite, goodNews, favorites: favoriteSelection, media, gallery, important, serendipity, sourceStatus: {total: sources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "s-maxage=900, stale-while-revalidate=1800"}});
 }

@@ -3,6 +3,7 @@ import {useEffect, useMemo, useState} from "react";
 
 const FALLBACK = "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=1400&q=80";
 const BATCH_SIZE = 25;
+const SERENDIPITY_BATCH_SIZE = 9;
 const categoryClass = section => `cat-${(section || "news").toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
 function age(date) { if (!date) return "From the shelf"; const hours = (Date.now() - new Date(date)) / 36e5; return hours < 1 ? `${Math.max(1, Math.round(hours * 60))} min ago` : hours < 24 ? `${Math.round(hours)} hr ago` : `${Math.round(hours / 24)}d ago`; }
 function Feedback({item, onRate}) { return <div className="controls" aria-label="Story feedback"><button onClick={() => onRate(item, "more")}>♡ More like this</button><button onClick={() => onRate(item, "less")}>Less</button><button onClick={() => onRate(item, "political")}>Too political</button><button onClick={() => onRate(item, "depressing")}>Too depressing</button></div>; }
@@ -19,7 +20,7 @@ function Story({item, index, onRate}) {
 }
 
 export default function Home() {
-  const [data, setData] = useState(null), [weather, setWeather] = useState(null), [batches, setBatches] = useState(1), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date());
+  const [data, setData] = useState(null), [weather, setWeather] = useState(null), [batches, setBatches] = useState(1), [serendipityCount, setSerendipityCount] = useState(3), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date());
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); fetch("/api/feed").then(response => response.json()).then(setData).catch(() => {}); fetch("/api/weather").then(response => response.json()).then(setWeather).catch(() => {}); return () => clearInterval(timer); }, []);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const date = now.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
@@ -39,7 +40,7 @@ export default function Home() {
     </section>
 
     <section className="important"><div className="importantIntro"><span>Importance override</span><h2>You Should Know</h2><p>A small, calm briefing of consequential stories—kept distinct from the things chosen simply to brighten your morning.</p></div><div className="importantGrid">{(data?.important || []).map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div></section>
-    {!!data?.serendipity?.length && <section className="serendipity"><div className="sectionHead"><div><span>One more magazine underneath</span><h2>You Didn&apos;t Ask For This…</h2></div><p>Worth the detour</p></div><div className="serendipityGrid">{data.serendipity.map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div></section>}
+    {!!data?.serendipity?.length && <section className="serendipity"><div className="sectionHead"><div><span>One more magazine underneath</span><h2>You Didn&apos;t Ask For This…</h2></div><p>Worth the detour</p></div><div className="serendipityGrid">{data.serendipity.slice(0, serendipityCount).map((item, index) => <Story item={item} index={index} onRate={rate} key={item.canonicalUrl} />)}</div>{serendipityCount < data.serendipity.length && <div className="loadWrap"><button className="loadBtn surpriseBtn" onClick={() => setSerendipityCount(count => count + SERENDIPITY_BATCH_SIZE)}>Add More Stuff I Didn&apos;t Ask For<span>↓</span></button></div>}</section>}
     <footer><b>BETTER START</b><span>Live RSS-first V2 · Feedback stays in this browser · No inbox debt</span></footer>
   </main>;
 }
