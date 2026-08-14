@@ -77,8 +77,9 @@ function compose(candidates, count, seed = {}) {
   while (chosen.length < count && pool.length) {
     let winner = 0, best = -Infinity;
     pool.forEach((item, index) => {
-      const sourcePenalty = (sourceCounts[item.source] || 0) >= 2 ? 1000 : (sourceCounts[item.source] || 0) * 24;
-      const topicPenalty = (topicCounts[item.section] || 0) * 18;
+      const recent = chosen.slice(-10);
+      const sourcePenalty = (sourceCounts[item.source] || 0) * 10 + (recent.some(previous => previous.source === item.source) ? 500 : 0);
+      const topicPenalty = (topicCounts[item.section] || 0) * 6 + (chosen.slice(-2).some(previous => previous.section === item.section) ? 30 : 0);
       const formatPenalty = (formatCounts[item.format] || 0) * 8;
       const visualBonus = item.image && !(formatCounts.visual || 0) ? 12 : 0;
       const serendipityBonus = item.interestHits === 0 && chosen.length > 3 ? 5 : 0;
@@ -172,7 +173,7 @@ export async function GET() {
   const taste = load("taste.json"), sources = load("sources.json"), favorites = load("favorites.json");
   const results = await Promise.allSettled(sources.map(async source => {
     const feed = await parser.parseURL(source.url);
-    return (feed.items || []).slice(0, 14).map((item, index) => {
+    return (feed.items || []).slice(0, 40).map((item, index) => {
       const scored = score(item, source, taste);
       const story = {title: plain(item.title) || "Untitled", url: item.link || "#", summary: plain(item.contentSnippet || item.content || ""), date: item.isoDate || item.pubDate || null, source: source.name, section: source.section, image: imageFor(item), ...scored};
       return {...story, format: formatFor(story, index)};
@@ -203,11 +204,11 @@ export async function GET() {
   const goodNews = claim(compose(all.filter(isGoodNews), 1))[0] || null;
   const [youtubeItems, bandcampItems] = await Promise.all([loadPlaylistDiscoveries(), loadBandcampReleases()]);
   const mediaPool = unique([...bandcampItems, ...youtubeItems]);
-  const media = claim(compose(mediaPool, 7));
+  const media = claim(compose(mediaPool, 20));
   const importantPool = all.filter(item => ["NASA", "NYT Technology", "Guardian Science"].includes(item.source) && isJoyful(item));
   const important = claim(compose(importantPool, 3));
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
-  const gallery = claim(compose(galleryPool, 24));
+  const gallery = claim(compose(galleryPool, 140));
   const serendipityPool = all.filter(item => item.interestHits === 0 && item.noHits === 0 && isJoyful(item) && !usedUrls.has(canonicalUrl(item.url)));
   const serendipity = claim(compose(serendipityPool, 3));
 

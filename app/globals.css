@@ -24,3 +24,4 @@
 @media(max-width:900px){.gallery{columns:3 220px}}
 @media(max-width:650px){.gallery{display:block;columns:2 150px;column-gap:9px}.gallery .tile,.gallery .tile-bandcamp,.gallery .tile-social{display:inline-flex;width:100%;min-height:0;margin-bottom:9px}.gallery .tile-feature,.gallery .tile-video{width:100%;min-height:0}.gallery .tile-feature h3{font-size:25px}.gallery .tile p{display:none}.gallery .tile-feature p,.gallery .tile-video p{display:block}}
 @media(max-width:360px){.gallery{columns:1}.gallery .tile p{display:block}}
+.galleryBatch+.galleryBatch{margin-top:12px}
