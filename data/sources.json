@@ -88,5 +88,53 @@
     "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
     "section": "SCIENCE + NATURE",
     "quality": 9
+  },
+  {
+    "name": "Yankees Dispatch",
+    "url": "https://news.google.com/rss/search?q=New+York+Yankees+win+OR+prospect+OR+return&hl=en-US&gl=US&ceid=US:en",
+    "section": "SPORTS",
+    "quality": 8
+  },
+  {
+    "name": "Twins Dispatch",
+    "url": "https://news.google.com/rss/search?q=Minnesota+Twins+win+OR+prospect+OR+return&hl=en-US&gl=US&ceid=US:en",
+    "section": "SPORTS",
+    "quality": 8
+  },
+  {
+    "name": "Giants Dispatch",
+    "url": "https://news.google.com/rss/search?q=San+Francisco+Giants+win+OR+prospect+OR+return&hl=en-US&gl=US&ceid=US:en",
+    "section": "SPORTS",
+    "quality": 8
+  },
+  {
+    "name": "US Open Tennis",
+    "url": "https://news.google.com/rss/search?q=US+Open+tennis+inspiring+OR+win+OR+comeback&hl=en-US&gl=US&ceid=US:en",
+    "section": "SPORTS",
+    "quality": 8
+  },
+  {
+    "name": "Good NYC",
+    "url": "https://news.google.com/rss/search?q=New+York+City+good+news+community+arts+opening&hl=en-US&gl=US&ceid=US:en",
+    "section": "NYC + PEOPLE",
+    "quality": 8
+  },
+  {
+    "name": "Animal Rescue",
+    "url": "https://news.google.com/rss/search?q=animal+rescue+adoption+reunited+good+news&hl=en-US&gl=US&ceid=US:en",
+    "section": "ANIMALS + JOY",
+    "quality": 8
+  },
+  {
+    "name": "Good Dogs",
+    "url": "https://news.google.com/rss/search?q=dog+rescue+adoption+hero+good+news&hl=en-US&gl=US&ceid=US:en",
+    "section": "ANIMALS + JOY",
+    "quality": 8
+  },
+  {
+    "name": "Human Bright Spots",
+    "url": "https://news.google.com/rss/search?q=positive+human+interest+kindness+community+uplifting&hl=en-US&gl=US&ceid=US:en",
+    "section": "PEOPLE + JOY",
+    "quality": 8
   }
 ]

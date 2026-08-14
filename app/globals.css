@@ -113,3 +113,21 @@
   .tetrisCluster .tile:nth-child(5) h3,.tetrisCluster .tile:nth-child(9) h3{margin-block:auto;font-size:16px}
 }
 @media(min-width:651px) and (max-width:900px){.tetrisCluster,.tetrisCluster.partialCluster{grid-template-rows:repeat(12,46px);grid-auto-rows:46px}.tetrisCluster.partialCluster{grid-template-rows:repeat(6,46px)}}
+
+/* V13 mobile edition: a legible editorial scroll, independent of the desktop puzzle. */
+.cat-sports{--accent:#8b4d16}.cat-nyc-people{--accent:#b23a67}.cat-animals-joy{--accent:#4d7c62}.cat-people-joy{--accent:#a35b20}
+@media(max-width:650px){
+  .tetrisCluster,.tetrisCluster.partialCluster{display:block;margin:0}
+  .tetrisCluster .tile:nth-child(n),.clusterVariant-1 .tile:nth-child(n),.clusterVariant-2 .tile:nth-child(n){display:flex;width:100%;height:auto!important;min-height:0;aspect-ratio:auto;overflow:hidden!important;margin:0 0 11px;grid-column:auto;grid-row:auto}
+  .tetrisCluster .tileBody{position:relative;inset:auto;display:flex;height:auto;max-height:none;min-height:0;overflow:visible;padding:14px;background:var(--card);color:var(--ink)}
+  .tetrisCluster .tile h3,.tetrisCluster .tile:nth-child(n) h3{font-size:clamp(21px,7.2vw,32px);line-height:.98;margin:8px 0;color:var(--accent);text-shadow:none}
+  .tetrisCluster .tile-pattern-1 h3,.tetrisCluster .tile-pattern-3 h3,.tetrisCluster .tile-pattern-5 h3,.tetrisCluster .tile-pattern-7 h3{font-size:clamp(17px,5.5vw,24px)}
+  .tetrisCluster .kicker{font-size:8px}.tetrisCluster .meta{margin-top:8px}.tetrisCluster .controls{display:flex;margin-top:9px}.tetrisCluster .tile p{display:block;font-size:13px}
+  .tetrisCluster .imageLink{display:block!important;position:relative;inset:auto;width:100%;height:auto;flex:none;background:#111}
+  .tetrisCluster .imageLink img{display:block;width:100%;height:auto;min-height:0;aspect-ratio:16/9;object-fit:cover}
+  .tetrisCluster .tile-visual .imageLink img,.tetrisCluster .tile-social .imageLink img,.tetrisCluster .tile-bandcamp .imageLink img{aspect-ratio:1;object-fit:cover}
+  .tetrisCluster .tile:nth-child(n).tile-video{aspect-ratio:16/9;height:auto!important;min-height:calc((100vw - 26px) * .5625);position:relative;background:#111}
+  .tetrisCluster .tile-video .imageLink{position:absolute;inset:0;height:100%}.tetrisCluster .tile-video .imageLink img{height:100%;aspect-ratio:auto;object-fit:contain}
+  .tetrisCluster .tile-video .tileBody{position:absolute;z-index:2;inset:auto 0 0;padding:34px 13px 11px;background:linear-gradient(transparent,rgba(0,0,0,.92));color:#fff}
+  .tetrisCluster .tile-video h3,.tetrisCluster .tile-video .kicker,.tetrisCluster .tile-video .meta{color:#fff;text-shadow:0 1px 4px #000}.tetrisCluster .tile-video .controls,.tetrisCluster .tile-video p{display:none}
+}

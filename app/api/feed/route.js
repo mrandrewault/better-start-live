@@ -37,7 +37,7 @@ function isDisallowed(item) {
 }
 function isJoyful(item) {
   const value = `${item.title || ""} ${item.summary || ""}`;
-  return /discover|new|beautiful|guide|best|love|return|release|photo|album|art|music|food|travel|space|nature|design|book|film|restor|celebrat|rescue|record|garden|recipe|festival|museum/i.test(value) && !/killed|deadly|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|begging|dashed dreams|cranky|torches|revolt|horrific|tariffs?|banned|terrible|domestic unrest/i.test(value);
+  return /discover|new|beautiful|guide|best|love|return|release|photo|album|art|music|food|travel|space|nature|design|book|film|restor|celebrat|rescue|record|garden|recipe|festival|museum|wins?\b|victory|comeback|walk[ -]?off|advance|prospect|adopt|reunited|kindness|community|uplifting|inspir|opens?/i.test(value) && !/killed|deadly|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|begging|dashed dreams|cranky|torches|revolt|horrific|tariffs?|banned|terrible|domestic unrest|abuse|neglect|euthan|injur|los(?:e|es|ing)|defeat/i.test(value);
 }
 function isGoodNews(item) {
   const value = `${item.title || ""} ${item.summary || ""}`;
