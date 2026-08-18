@@ -1,37 +1,87 @@
-# Better Start — Andrew's Edition (Live V1)
+# Upwards — Andrew’s Edition · Build 02
 
-A live RSS-first personalized morning homepage.
+This version makes photography and playable media a composition requirement rather than a ranking preference.
 
-## Live now
-- Smart time-of-day greeting
-- Live New Canaan weather via Open-Meteo
-- Live RSS aggregation from music, photography, film/culture, books, tech/AI, design, food/travel and science sources
-- Live Substack feeds for Jeff Tweedy, Joel Stein, Grissom, José Andrés, The Gall and Aaron Parnas
-- Personalized scoring using explicit YES / DON'T WANT interests
-- Recency weighting, clickbait penalty and duplicate clustering
-- FOR YOU editorial layout
-- LOAD MORE GOOD NEWS
-- YOU SHOULD KNOW importance lane
-- YOU DIDN'T ASK FOR THIS serendipity lane
-- Local feedback persistence
-- Your uploaded YouTube subscriptions and playlist CSVs bundled into /data for the next ranking pass
+## New in V11
 
-## Intentionally deferred
-- Instagram/TikTok ingestion: Today's Eye is present, but it does not rely on brittle scraping
-- Better Start Radio audio backend
-- Login/cloud sync
-- Paid news APIs
-- AI semantic ranking
+- Adds a browser-side image quality gate: imagery must have a long edge of at least 900px, a short edge of at least 500px and at least 700,000 total pixels.
+- A broken or undersized image is never enlarged into a feature frame.
+- When possible, a rejected image causes the entire module to be replaced by a distinct, credited high-resolution visual-shelf feature; it is never used as unrelated decoration for the original story.
+- If no truthful visual replacement is available, the story becomes a deliberately compact text module.
+- YouTube previews now request their maximum-resolution artwork rather than the small default thumbnail.
+- Expands the licensed visual reserve so the opening wall has replacements ready before a low-resolution source image reaches the screen.
 
-## Run locally
-Requires Node 18+.
+## Carried forward from V10
 
-1. `npm install`
-2. `npm run dev`
-3. Open `http://localhost:3000`
+- Checks up to 72 relevant source pages for Open Graph/Twitter images when RSS omits them.
+- Redistributes available visuals so every ten-story cluster targets at least 50% honest imagery, video or interaction.
+- Raises media frequency from one per three stories to one per two while media is available.
+- Reserves large frames for visual/playable modules and keeps text-only stories compact.
+- Never attaches an unrelated photograph to a story merely to decorate its card.
+- Establishes the rule that edition-specific visual shelves must use licensed or explicitly displayable sources.
+- Adds edition-aware, attributed Wikimedia Commons visual shelves when publisher imagery runs out (fashion, outdoors, sports, business, food, culture, science and general discovery each use distinct searches).
 
-## Deploy
-This is a standard Next.js app and can be deployed to Vercel. Import the project/repository and deploy.
+## Carried forward from V9
 
-## Notes
-RSS feeds can change. The app tolerates individual feed failures, so one broken source will not break the whole edition.
+- Text-card colors are assigned by one page-wide palette sequence rather than repeating inside every layout cluster.
+- No exact background swatch is reused in the loaded page; returning color families receive different hue, saturation and lightness values.
+- Neighboring swatches come from deliberately separated color families, with automatic dark/light foreground contrast.
+- Load More continues the same palette sequence, while the consequential and surprise sections use separate non-colliding ranges.
+
+- A calmer four-pass taste interview: 12 broad opening choices, a tailored follow-up, subjects, then names and specifics.
+- A new Philanthropy + Community lane emphasizes beneficiaries, measurable results and money put to genuine public use.
+- Amazon and Jeff Bezos are blocked globally; MacKenzie Scott and constructive philanthropy remain welcome.
+- The first 20 Good Stuff stories target at least 60% genuine editorial imagery; fashion-led editions require 70%. Logos, gradients and colored text cards never count as pictures.
+- The first interview screen includes a direct **Fashion with a capital F** doorway.
+- Fashion text modules rotate through a controlled spectrum of saturated, tinted, deep and neutral colors instead of defaulting to monochrome or pink.
+- Weight-loss and body-anxiety filters now cover hyphenated wording and every visible page surface.
+
+## Editorial identity foundation
+
+- An editorial identity engine gives fashion, sports, business, outdoors, food, arts, science, books and making-focused editions their own publication logic.
+- Fashion-led editions use a restrained cream, black and seasonal-accent system inspired by independent fashion magazines—not default pink.
+- The fashion opening is image-first and reserves its lead frames for relevant fashion, portrait, runway, costume, book and culture imagery.
+- Missing RSS artwork is recovered from article Open Graph metadata for a controlled set of high-value specialist stories.
+- Fashion editions block BMI, weight-loss, body-fat and appearance-anxiety stories, plus distressing animal imagery, from their main composition.
+- The women-writers bench now spans major fiction, international voices, essays, poetry, thrillers, speculative fiction and fantasy.
+- New source packs cover outdoors, food and travel, arts and performance, and science and technology.
+- Editorial-reference data documents the visual and editorial worlds guiding every identity, so those desks can deepen over time.
+
+- Fashion-literate prompts covering Fashion Week, Bergdorf’s, Le Bon Marché, runway collecting and production design.
+- Deep choices for fashion insiders, independent press, boutique labels, vintage runway, department stores and emerging designers.
+- A broad women-writers shelf rather than a single author standing in for the category.
+- New editorial inputs from The Gentlewoman, AnOther, System, Acne Paper, Vestoj, 1 Granary, SHOWstudio and other independent magazines.
+- Strong fashion/women’s profiles use an 80/12/8 direct/adjacent/surprise opening composition.
+- Unrelated generic videos cannot displace relevant fashion and women-centered stories in that mode.
+
+- Text-only stories receive intentional category-colored editorial art direction instead of looking like missing-image placeholders.
+- RSS image recovery now checks enclosures, media fields, lazy-loaded images and source sets before declaring a story text-only.
+- Fashion coverage now reaches runway, couture, French and Italian houses, costume design, fashion photography, archives and 1990s style.
+- A new Women, Culture + Modern Life desk covers women’s sports, WTA tennis, running, Pilates, wellness, beauty craft, writers, artists and leaders.
+- New interview pathways include “I follow fashion beyond what’s in stores,” “I want more stories about remarkable women” and “I notice the costumes before the plot.”
+
+- Eight specialist source packs:
+  - The Sporting Life
+  - Business, Ideas + Good Living
+  - Fashion, Image + Style
+  - Women, Culture + Modern Life
+  - Books, History + Archives
+  - Movement + Wellbeing
+  - Making, Fixing + Growing
+  - Cars, Boats + Beautiful Machines
+- A person’s interview choices activate up to four relevant packs.
+- Specialist stories are labeled quietly inside the wall.
+- A compact strip beneath the masthead explains which editorial desks are contributing to the edition.
+- New interview choices cover projects, gardening, boats, sailing and history; deeper choices cover yoga and boatbuilding.
+- Generic Reader behavior is unchanged when no personal profile exists.
+- All established safety, deduplication, source-spacing, refresh, seven-day memory, layout, mobile, Save, Share and Joy Bench rules remain active.
+
+## Login-free deployment
+
+1. Create a new GitHub repository named `upwards-andrews-edition`.
+2. Upload the **contents** of this folder.
+3. In Vercel choose **Add New → Project** and import that repository.
+4. Leave the defaults unchanged and click **Deploy**.
+5. Share the main production `vercel.app` address.
+
+No login, database or environment variables are required for this test version. Each tester’s choices are stored privately in that browser.

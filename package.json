@@ -1,6 +1,6 @@
 {
-  "name": "better-start-andrew",
-  "version": "1.0.0",
+  "name": "upwards-andrews-edition",
+  "version": "6.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
