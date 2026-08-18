@@ -1,4 +1,4 @@
-# Upwards — Andrew’s Edition · Build 02
+# Upwards — Andrew’s Edition · Build 03
 
 This version makes photography and playable media a composition requirement rather than a ranking preference.
 
