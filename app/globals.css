@@ -264,36 +264,13 @@
 @media(max-width:650px){.identity-fashion .brand{font-size:14px}.identity-fashion .galleryBatch:first-child .tetrisCluster:first-child .tile:first-child .imageLink{flex-basis:auto}.identity-fashion .favorite:nth-child(n){background:#fff;color:#111}.identity-fashion .favorite:nth-child(3n+2){background:#111;color:#fff}}
 
 /* V12: text cards must read as intentional modules, never missing media. */
-.tetrisCluster .tile-no-image{
-  grid-row:auto!important;
-  height:max-content!important;
-  min-height:0!important;
-  align-self:start!important;
-}
-.tetrisCluster .tile-no-image .tileBody{
-  height:auto!important;
-  min-height:0!important;
-  justify-content:flex-start!important;
-  padding:14px!important;
-}
-.tetrisCluster .tile-no-image h3{
-  margin:14px 0 10px!important;
-}
-.tetrisCluster .tile-no-image .meta{
-  margin-top:8px!important;
-}
-.tetrisCluster .tile-compact-text{
-  grid-column:span 3!important;
-  max-height:260px!important;
-  overflow:hidden!important;
-}
-.tetrisCluster .tile-compact-text h3{
-  font-size:clamp(17px,1.55vw,24px)!important;
-  line-height:1.02!important;
-}
-.tetrisCluster .tile-compact-text .controls{
-  margin-top:7px!important;
-}
+.tetrisCluster .tile-no-image{grid-row:auto!important;height:max-content!important;min-height:0!important;align-self:start!important}
+.tetrisCluster .tile-no-image .tileBody{height:auto!important;min-height:0!important;justify-content:flex-start!important;padding:14px!important}
+.tetrisCluster .tile-no-image h3{margin:14px 0 10px!important}
+.tetrisCluster .tile-no-image .meta{margin-top:8px!important}
+.tetrisCluster .tile-compact-text{grid-column:span 3!important;max-height:260px!important;overflow:hidden!important}
+.tetrisCluster .tile-compact-text h3{font-size:clamp(17px,1.55vw,24px)!important;line-height:1.02!important}
+.tetrisCluster .tile-compact-text .controls{margin-top:7px!important}
 @media(max-width:900px){.tetrisCluster .tile-compact-text{grid-column:span 3!important}}
 @media(max-width:650px){.tetrisCluster .tile-no-image,.tetrisCluster .tile-compact-text{grid-column:1/-1!important;min-height:0!important;max-height:none!important}.tetrisCluster .tile-no-image .tileBody{padding:13px!important}}
 
