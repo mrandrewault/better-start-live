@@ -11,6 +11,8 @@ const dataPath = name => path.join(process.cwd(), "data", name);
 const load = name => JSON.parse(fs.readFileSync(dataPath(name), "utf8"));
 const blockedTerms = Object.values(load("content-policy.json")).flat();
 const policyText = value => ` ${String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()} `;
+const stableHash = value => { let hash = 2166136261; for (const char of String(value || "")) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(36); };
+const publicSpaceUnsafe = /\b(porn(?:ography|ographic)?|nsfw|nud(?:e|ity)|naked|topless|full[- ]?frontal|genitals?|penis|vulva|vagina|erotic(?:a)?|sexually explicit|adult content|figure stud(?:y|ies)|boudoir)\b/i;
 
 function plain(value = "") {
   return value.replace(/<[^>]+>/g, " ").replace(/&\w+;/g, " ").replace(/\s+/g, " ").trim();
@@ -57,7 +59,11 @@ function isDisallowed(item) {
   const value = policyText(`${item.title || ""} ${item.summary || ""} ${item.contentSnippet || ""} ${item.source || ""} ${item.section || ""}`);
   const raw = `${item.title || ""} ${item.summary || ""} ${item.contentSnippet || ""} ${item.source || ""} ${item.section || ""}`;
   const corporateAmazon = /\bamazon(?:'s)?\b/i.test(raw) && !/\bamazon (?:rainforest|river|basin|forest|region|wildlife)\b/i.test(raw);
-  return corporateAmazon || /\bjeff bezos\b/i.test(raw) || bodyAnxiety.test(raw) || blockedTerms.some(term => value.includes(policyText(term)));
+  return corporateAmazon || /\bjeff bezos\b/i.test(raw) || bodyAnxiety.test(raw) || publicSpaceUnsafe.test(raw) || blockedTerms.some(term => value.includes(policyText(term)));
+}
+function wasRecentlyShown(item, avoidStories) {
+  if (!avoidStories?.size) return false;
+  return [canonicalUrl(item.url), `url:${canonicalUrl(item.url)}`, normalizeTitle(item.title), `title:${normalizeTitle(item.title)}`, item.image, `image:${item.image || ""}`].filter(Boolean).some(value => avoidStories.has(stableHash(value)));
 }
 function hasBadMood(value) {
   return /killed|deadly|fatal|crash|unsafe|controvers|war|attack|crisis|disaster|outrage|scandal|cancer|dies?\b|death|threat|fear|horrific|tariffs?|banned|terrible|abuse|neglect|euthan|injur|defeat|worsen|\bworst\b/i.test(value);
@@ -167,7 +173,7 @@ const visualSearches = {
   sports:["sports photography", "baseball photography", "tennis photography", "running athletics photography"],
   business:["modern architecture photography", "craft workshop photography", "city design photography", "independent shop photography"],
   food:["food photography", "restaurant interior photography", "bakery photography", "market food photography"],
-  culture:["museum art photography", "theatre performance photography", "bookshop photography", "artist studio photography"],
+  culture:["museum architecture photography", "theatre stage photography", "bookshop photography", "artist studio workspace photography"],
   science:["astronomy photography", "microscopy photography", "natural history museum", "scientific instrument photography"],
   general:["art photography", "beautiful nature photography", "architecture photography", "human interest photography"]
 };
@@ -184,7 +190,8 @@ async function loadVisualShelf(identity, count = 80) {
         const title = plain(page.title?.replace(/^File:/i, "").replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " "));
         const artist = plain(metadata.Artist?.value || metadata.Credit?.value || "Wikimedia Commons contributor").slice(0, 90);
         const license = plain(metadata.LicenseShortName?.value || metadata.UsageTerms?.value || "Open license").slice(0, 50);
-        if (!image || !/^image\/(jpeg|png|webp)$/i.test(info?.mime || "") || title.length < 5 || !isEnglishText(title) || isDisallowed({title})) return;
+        const safetyMetadata = `${title} ${plain(metadata.ImageDescription?.value || "")} ${plain(metadata.Categories?.value || "")} ${plain(metadata.DepictedPeople?.value || "")}`;
+        if (!image || !/^image\/(jpeg|png|webp)$/i.test(info?.mime || "") || title.length < 5 || !isEnglishText(title) || isDisallowed({title:safetyMetadata})) return;
         results.push({title, url:`https://commons.wikimedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, "_"))}`, summary:"", date:null, source:`${artist} · ${license}`, section:"VISUAL SHELF", image, score:95, interestHits:4, noHits:0, personalFit:"direct", format:"visual", sourcePack:"visual-shelf", sourcePackLabel:`${identity.label} visual shelf`, visualShelf:true});
       });
     } catch {}
@@ -325,7 +332,7 @@ async function loadReaderVideos(avoid = new Set()) {
 }
 
 export async function GET(request) {
-  const params = new URL(request.url).searchParams, random = seededRandom(params.get("visit") || String(Math.floor(Date.now() / 72e5))), avoidVideos = new Set((params.get("avoid") || "").split(",").filter(Boolean)), localPlaces = (params.get("places") || "").split("|").map(value => value.trim().toLowerCase()).filter(Boolean).slice(0, 20), interests = (params.get("interests") || "").split("|").map(value => value.trim().toLowerCase()).filter(Boolean).slice(0, 48);
+  const params = new URL(request.url).searchParams, random = seededRandom(params.get("visit") || String(Math.floor(Date.now() / 72e5))), avoidVideos = new Set((params.get("avoid") || "").split(",").filter(Boolean)), avoidStories = new Set((params.get("avoidStories") || "").split(",").filter(Boolean)), localPlaces = (params.get("places") || "").split("|").map(value => value.trim().toLowerCase()).filter(Boolean).slice(0, 20), interests = (params.get("interests") || "").split("|").map(value => value.trim().toLowerCase()).filter(Boolean).slice(0, 48);
   const taste = load("taste.json"), baseSources = load("sources.json"), activePacks = activateSourcePacks(interests, load("source-packs.json")), editorialIdentity = detectEditorialIdentity(interests, activePacks), specialistSources = activePacks.flatMap(pack => pack.sources.map(source => ({...source, pack:pack.id, packLabel:pack.label, packHits:pack.hits}))), sources = [...baseSources, ...specialistSources];
   const results = await Promise.allSettled(sources.map(async source => {
     const feed = await parser.parseURL(source.url);
@@ -337,7 +344,7 @@ export async function GET(request) {
   }));
   let all = [];
   results.forEach(result => { if (result.status === "fulfilled") all.push(...result.value); });
-  all = unique(all.filter(item => item.score > 18 && isEnglishItem(item) && !isDisallowed(item) && contextAllowed(item, editorialIdentity) && (isJoyful(item) || (item.sourcePack && isSpecialistWorthwhile(item))) && isFreshLocal(item)).map(item => personalize(item, interests)).sort((a, b) => b.score - a.score));
+  all = unique(all.filter(item => item.score > 18 && isEnglishItem(item) && !isDisallowed(item) && !wasRecentlyShown(item, avoidStories) && contextAllowed(item, editorialIdentity) && (isJoyful(item) || (item.sourcePack && isSpecialistWorthwhile(item))) && isFreshLocal(item)).map(item => personalize(item, interests)).sort((a, b) => b.score - a.score));
   all = await enrichIdentityImages(all, editorialIdentity);
 
   // One shared registry across every page region makes duplicates impossible.
@@ -399,7 +406,7 @@ export async function GET(request) {
   // If publishers still do not supply enough images, insert attributed,
   // openly licensed standalone photography. These are honest visual features,
   // never unrelated decorations attached to another story.
-  const allVisualShelf = await loadVisualShelf(editorialIdentity);
+  const allVisualShelf = (await loadVisualShelf(editorialIdentity)).filter(item => !wasRecentlyShown(item, avoidStories));
   const visualShelf = claim(allVisualShelf.slice(0, 56));
   gallery = distributeVisuals([...gallery, ...visualShelf], editorialIdentity).slice(0, 140);
   const galleryKeys = new Set(gallery.map(item => canonicalUrl(item.url)));

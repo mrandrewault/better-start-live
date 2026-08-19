@@ -1,4 +1,13 @@
-# Meanwhile 02 — Andrew’s Edition
+# Meanwhile 06 — Andrew’s Edition · Vignelli Overlap
+
+Centered masthead option 4: overlapping, palette-aware wordmarks inspired by Vignelli. The personalizer and reader below the masthead are unchanged.
+
+## Refresh and public-space safety
+
+- Roughly 80% of the page refreshes every two hours.
+- The complete edition is replaced after 24 hours and on a manual browser reload.
+- Canonical URLs, normalized titles, video IDs, and image URLs are remembered for seven days to prevent repeats.
+- Public-space safety filtering excludes nudity and sexually explicit material, including artistic imagery, using story and media metadata.
 
 This is Andrew’s newest working edition, rebranded as **Meanwhile**. It preserves the compact useful-information ticker and all visual-quality, composition, safety, deduplication, seven-day memory, sharing and responsive-layout improvements from the preceding build.
 
