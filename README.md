@@ -1,8 +1,10 @@
-# Upwards — Andrew’s Edition · Build 04
+# Meanwhile 02 — Andrew’s Edition
+
+This is Andrew’s newest working edition, rebranded as **Meanwhile**. It preserves the compact useful-information ticker and all visual-quality, composition, safety, deduplication, seven-day memory, sharing and responsive-layout improvements from the preceding build.
 
 This version makes photography and playable media a composition requirement rather than a ranking preference.
 
-## New in V11
+## Foundation carried into Meanwhile 02
 
 - Adds a browser-side image quality gate: imagery must have a long edge of at least 900px, a short edge of at least 500px and at least 700,000 total pixels.
 - A broken or undersized image is never enlarged into a feature frame.
@@ -78,7 +80,7 @@ This version makes photography and playable media a composition requirement rath
 
 ## Login-free deployment
 
-1. Create a new GitHub repository named `upwards-andrews-edition`.
+1. Create a new GitHub repository named `meanwhile-andrews-edition` (or update the repository you already use for Andrew’s Edition).
 2. Upload the **contents** of this folder.
 3. In Vercel choose **Add New → Project** and import that repository.
 4. Leave the defaults unchanged and click **Deploy**.
