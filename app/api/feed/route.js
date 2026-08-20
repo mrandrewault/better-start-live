@@ -374,6 +374,22 @@ export async function GET(request) {
     const backfillPool = all.filter(item => (!usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title))) && /SCIENCE|NATURE|TECH|PROGRESS|PEOPLE|ANIMALS|OUTDOOR/i.test(item.section || ""));
     important.push(...claim(compose(backfillPool, 3 - important.length, {}, random)));
   }
+  // Reserve a deep, fresh surprise shelf before the main gallery claims the
+  // remaining pool. This keeps serendipity available without weakening the
+  // page-wide URL/title dedupe or the cross-visit freshness rules.
+  const unusedStories = () => all.filter(item =>
+    !usedUrls.has(canonicalUrl(item.url)) &&
+    !usedTitles.has(normalizeTitle(item.title))
+  );
+  const serendipity = [];
+  const reserveSerendipity = pool => {
+    if (serendipity.length >= 60) return;
+    serendipity.push(...claim(compose(pool, 60 - serendipity.length, {}, random)));
+  };
+  reserveSerendipity(unusedStories().filter(item => item.noHits === 0 || item.personalFit === "editorial"));
+  reserveSerendipity(unusedStories().filter(item => item.personalFit === "adjacent"));
+  reserveSerendipity(unusedStories());
+
   const galleryPool = all.filter(item => !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
   let gallery;
   if (interests.length) {
@@ -412,8 +428,5 @@ export async function GET(request) {
   gallery = distributeVisuals([...gallery, ...visualShelf], editorialIdentity).slice(0, 140);
   const galleryKeys = new Set(gallery.map(item => canonicalUrl(item.url)));
   const visualReserve = allVisualShelf.slice(56).filter(item => !galleryKeys.has(canonicalUrl(item.url))).slice(0, 24).map(item => ({...item, canonicalUrl:canonicalUrl(item.url)}));
-  const serendipityPool = all.filter(item => item.noHits === 0 && !usedUrls.has(canonicalUrl(item.url)) && !usedTitles.has(normalizeTitle(item.title)));
-  const serendipity = claim(compose(serendipityPool, 60, {}, random));
-
   return Response.json({generatedAt: new Date().toISOString(), edition: Math.floor(Date.now() / 72e5), personalized:!!interests.length, editorialIdentity:{id:editorialIdentity.id,label:editorialIdentity.label,accent:editorialIdentity.accent,references:editorialIdentity.references,imageTarget:editorialIdentity.imageTarget}, composition:fashionFocus?{direct:80,adjacent:12,editorial:8}:{direct:65,adjacent:20,editorial:15}, activeSourcePacks:activePacks.map(pack => ({id:pack.id,label:pack.label,hits:pack.hits})), tickerStories, ribbonFavorite, goodNews, favorites: favoriteSelection, media, gallery, visualReserve, important, serendipity, sourceStatus: {total: sources.length, specialist:specialistSources.length, successful: results.filter(result => result.status === "fulfilled").length}}, {headers: {"Cache-Control": "no-store"}});
 }
