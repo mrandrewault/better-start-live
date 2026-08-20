@@ -1,4 +1,8 @@
-# Meanwhile 06 — Andrew’s Edition · Vignelli Overlap
+# Meanwhile 09 — Andrew’s Edition · Legible Palette Masthead
+
+This is the next version of Andrew’s Color Hunt edition. It preserves the complete Andrew feed and applies the same masthead legibility contract as the personalized reader: one palette-aware color per letter, controlled chroma and lightness, strong paper contrast, and visible separation between neighboring letters. Stacked wordmarks and multiply blending have been removed so **MEANWHILE** cannot collapse into a dark blur.
+
+This build adds Andrew's 40 deduplicated Color Hunt families in high rotation, plus eight new Meanwhile palettes inspired by them. Each reload advances the page and centered Vignelli masthead together. A contrast gate repairs overly pale or dark letter colors and introduces a harmonious accent when a palette is too narrow, keeping every **MEANWHILE** impression legible.
 
 Centered masthead option 4: overlapping, palette-aware wordmarks inspired by Vignelli. The personalizer and reader below the masthead are unchanged.
 
@@ -6,10 +10,11 @@ Centered masthead option 4: overlapping, palette-aware wordmarks inspired by Vig
 
 - Roughly 80% of the page refreshes every two hours.
 - The complete edition is replaced after 24 hours and on a manual browser reload.
-- Canonical URLs, normalized titles, video IDs, and image URLs are remembered for seven days to prevent repeats.
+- Every surfaced item enters one edition-wide no-repeat ledger, matched by canonical URL, normalized title, video ID, and image URL. It cannot return to Good Stuff, Bright Spots, Good News With Consequence, You Didn’t Ask For This, tickers, video modules, or visual shelves.
+- Saved stories remain available in the Saved shelf but are never recycled into the live edition.
 - Public-space safety filtering excludes nudity and sexually explicit material, including artistic imagery, using story and media metadata.
 
-This is Andrew’s newest working edition, rebranded as **Meanwhile**. It preserves the compact useful-information ticker and all visual-quality, composition, safety, deduplication, seven-day memory, sharing and responsive-layout improvements from the preceding build.
+This is Andrew’s newest working edition, rebranded as **Meanwhile**. It preserves the compact useful-information ticker and all visual-quality, composition, safety, global no-repeat memory, sharing and responsive-layout improvements from the preceding build.
 
 This version makes photography and playable media a composition requirement rather than a ranking preference.
 
@@ -85,7 +90,7 @@ This version makes photography and playable media a composition requirement rath
 - A compact strip beneath the masthead explains which editorial desks are contributing to the edition.
 - New interview choices cover projects, gardening, boats, sailing and history; deeper choices cover yoga and boatbuilding.
 - Generic Reader behavior is unchanged when no personal profile exists.
-- All established safety, deduplication, source-spacing, refresh, seven-day memory, layout, mobile, Save, Share and Joy Bench rules remain active.
+- All established safety, deduplication, source-spacing, refresh, global no-repeat memory, layout, mobile, Save, Share and Joy Bench rules remain active.
 
 ## Login-free deployment
 
