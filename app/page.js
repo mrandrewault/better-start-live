@@ -41,7 +41,7 @@ const categoryClass = section => `cat-${(section || "news").toLowerCase().replac
 const normalizedIdentityTitle = value => (value || "").toLowerCase().replace(/\b(the|a|an|and|or|but|to|of|for|in|on|at|with|from)\b/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 const emergencyBlocked = /\b(trump|maga|maha|nazi|neo[- ]?nazi|white supremac|shooting|gunman|murder|war|terroris|rape|sexual abuse|suicide|overdose|deadly|killed|outrage|religious|anti[- ]?vax|ufc|mma|gambling|google pixel|samsung galaxy|android phone|jeff bezos|bmi|body fat|weight[- ]loss|being thin|obesity|overweight|porn(?:ography|ographic)?|nsfw|nud(?:e|ity)|naked|topless|full[- ]?frontal|genitals?|penis|vulva|vagina|erotic(?:a)?|sexually explicit)\b/i;
 const corporateAmazonBlocked = value => /\bamazon(?:'s)?\b/i.test(value) && !/\bamazon (?:rainforest|river|basin|forest|region|wildlife)\b/i.test(value);
-const identityKeys = item => [`url:${item?.canonicalUrl || item?.url || ""}`, `title:${item?.normalizedTitle || normalizedIdentityTitle(item?.title)}`, `image:${item?.image || ""}`].filter(key => !key.endsWith(":"));
+const identityKeys = item => [`url:${item?.canonicalUrl || item?.url || ""}`, `title:${item?.normalizedTitle || normalizedIdentityTitle(item?.title)}`, `image:${item?.image || ""}`, `video:${item?.videoId || ""}`].filter(key => !key.endsWith(":"));
 const stableHash = value => { let hash = 2166136261; for (const char of String(value || "")) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(36); };
 const claimUnique = (items = [], seen = new Set()) => items.filter(item => {
   const safetyText = `${item?.title || ""} ${item?.summary || ""} ${item?.source || ""} ${item?.section || ""}`;
@@ -283,7 +283,7 @@ export default function Home() {
   const savedKeys = useMemo(() => new Set(saved.map(itemKey)), [saved]);
   const identityClass = `identity-${data?.editorialIdentity?.id || "general"}`;
   const palette = EDITION_PALETTES[paletteIndex], masthead = mastheadPalette(palette), paletteStyle = {"--palette-1":palette[0],"--palette-2":palette[1],"--palette-3":palette[2],"--palette-4":palette[3]};
-  const editionTitle = profile?.title?.replace(/^Meanwhile\s*[—-]\s*/i, "") || "Andrew’s Edition";
+  const editionTitle = "Andrew’s Edition";
   return <main style={paletteStyle} className={`shell daypart-${daypart} ${identityClass}`} data-editorial-identity={data?.editorialIdentity?.label || "Meanwhile"}>
     <header className="mast"><div className="mastIdentity"><div className="brand brandVignelli" aria-label="Meanwhile">{"Meanwhile".split("").map((letter,index) => <span aria-hidden="true" style={{color:masthead[index]}} key={`${letter}-${index}`}>{letter}</span>)}</div><div className="editionName">{editionTitle}</div><div className="edition">Rage-free news, discovery & good times</div></div><div className="mastTools"><a className="personalizeButton" href="/make-it-yours">Tune my edition</a><button className="savedButton" onClick={() => setShowSaved(value => !value)}>Saved <b>{saved.length}</b></button><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Meanwhile Radio ${radio ? "on" : "off"}`} title="Meanwhile Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button></div></header>
     <div className="hello"><h1>{greeting}.</h1><div className="helloAside"><p>{date}</p><span>{helloThought}</span></div></div>

@@ -1,4 +1,6 @@
-# Meanwhile 09 — Andrew’s Edition · Legible Palette Masthead
+# Meanwhile 11 — Andrew’s Edition · Global Freshness + Source Rotation
+
+Videos, stories, ticker items and visual-shelf entries now use one shared identity contract. YouTube video IDs participate in the same edition-wide exclusion history as canonical URLs and normalized titles, so a watched KQED or other video cannot immediately return through a different page section. Feed composition also caps source concentration and strongly prefers an eligible publication from the same editorial pool when a familiar source has exhausted its fresh material. Ordinary feed stories are limited to 45 days and specialist-source items to 120 days, preventing stale archive pieces such as the recurring Martin Amis item from becoming permanent fixtures.
 
 This is the next version of Andrew’s Color Hunt edition. It preserves the complete Andrew feed and applies the same masthead legibility contract as the personalized reader: one palette-aware color per letter, controlled chroma and lightness, strong paper contrast, and visible separation between neighboring letters. Stacked wordmarks and multiply blending have been removed so **MEANWHILE** cannot collapse into a dark blur.
 
