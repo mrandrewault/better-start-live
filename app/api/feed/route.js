@@ -47,7 +47,7 @@ const religionUnsafe = /\b(?:religion|religious|faith(?:ful)?|christian(?:ity)?|
 const editoriallyExcluded = /\b(pickleball|tesla|cybertruck|elon musk|mark zuckerberg|meta platforms?|marvel cinematic|gordon ramsay|guy fieri|wall street|stock market|james patterson|young adult fiction|horror film|horror novel|hunting)\b/i;
 // Confirmed archive repeats stay retired even for readers whose older browser
 // history predates the permanent story ledger.
-const retiredRepeat = /\b(?:james hetfield.*metallica|cis football (?:field|locations?)|runway magazine covers? celebrating 25th anniversary|rocky horror.*mad scientist|chanel iman.*runway.*2009|not all boredom is the same)\b/i;
+const retiredRepeat = /\b(?:james hetfield.*metallica|cis football (?:field|locations?)|runway magazine covers? celebrating 25th anniversary|rocky horror.*mad scientist|chanel iman.*runway.*2009|not all boredom is the same|lush foliage permeates xanthe burdett)\b/i;
 // Meanwhile is a politics-free publication. This deliberately excludes the
 // office and institution, not merely partisan vocabulary: a culture, travel,
 // style or arts story about a political figure is still a political story.

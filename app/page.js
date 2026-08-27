@@ -118,7 +118,7 @@ const routineSportsBlocked = /\b(?:final score|box score|standings|power ranking
 const corporateAmazonBlocked = value => /\bamazon(?:'s)?\b/i.test(value) && !/\bamazon (?:rainforest|river|basin|forest|region|wildlife)\b/i.test(value);
 const titleFingerprint = value => normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 2).slice(0, 9).join(" ");
 const titleFamily = value => [...new Set(normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 3))].sort().slice(0, 14).join(" ");
-const retiredRepeat = /\b(?:james hetfield.*metallica|cis football (?:field|locations?)|runway magazine covers? celebrating 25th anniversary|rocky horror.*mad scientist|chanel iman.*runway.*2009|not all boredom is the same)\b/i;
+const retiredRepeat = /\b(?:james hetfield.*metallica|cis football (?:field|locations?)|runway magazine covers? celebrating 25th anniversary|rocky horror.*mad scientist|chanel iman.*runway.*2009|not all boredom is the same|lush foliage permeates xanthe burdett)\b/i;
 const educationCultureWarBlocked = /(?:\b(?:lgbtq?|transgender|gender identity|drag queen|pride)\b.{0,90}\b(?:child(?:ren)?|kids?|school|classroom|curriculum|education|library|books?|reading hour)\b|\b(?:child(?:ren)?|kids?|school|classroom|curriculum|education|library|books?|reading hour)\b.{0,90}\b(?:lgbtq?|transgender|gender identity|drag queen|pride)\b)/i;
 const titleWords = value => new Set(normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 2).map(word => word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word));
 const nearSameTitle = (left, right) => {
@@ -258,6 +258,17 @@ const deliveredInventoryHashes = (includeCurrent = false) => { const state = rot
 const editionInventoryItems = edition => [...(edition?.tickerStories || []), edition?.goodNews, ...(edition?.favorites || []), ...(edition?.important || []), ...(edition?.gallery || []), ...(edition?.media || []), ...(edition?.serendipity || []), ...(edition?.visualReserve || [])].filter(Boolean);
 const recordDeliveredInventory = edition => { const state = rotateDeliveredInventory(), current = new Set(state.current); editionInventoryItems(edition).forEach(item => identityHashes(item).forEach(hash => current.add(hash))); state.current = [...current]; writeDeliveredInventory(state); };
 const rememberPriorInventory = edition => { const state = rotateDeliveredInventory(), prior = new Set(state.prior); editionInventoryItems(edition).forEach(item => identityHashes(item).forEach(hash => prior.add(hash))); state.prior = [...prior]; writeDeliveredInventory(state); };
+const syncDeliveredInventoryToCloud = async (edition, user) => {
+  if (!supabase || !user) return;
+  const lastSeenAt = new Date().toISOString(), storyKeys = new Set();
+  const rows = editionInventoryItems(edition).filter(item => item?.format !== "joy").map(item => {
+    const storyKey = itemKey(item);
+    if (!storyKey || storyKeys.has(storyKey)) return null;
+    storyKeys.add(storyKey);
+    return {user_id:user.id, story_key:storyKey, identity_keys:identityKeys(item), story:item, last_seen_at:lastSeenAt};
+  }).filter(Boolean);
+  if (rows.length) await supabase.from("story_history").upsert(rows, {onConflict:"user_id,story_key"});
+};
 const recentStoryAvoidance = (includeCurrent = false) => {
   // Compact hashes let the complete permanent ledger travel in the POST body
   // without repeatedly serializing full titles, URLs and image records.
@@ -527,9 +538,14 @@ export default function Home() {
     let cachedSnapshot = null;
     try {
       cachedSnapshot = JSON.parse(localStorage.getItem(FEED_SNAPSHOT_KEY) || "null");
-      // Migrate previously delivered benches too, so deploying this audit does
-      // not grant yesterday's V2/V3 cards one final repeat.
+      // Register the immediately previous V4 bench before requesting anything.
+      // The former migration only imported V2/V3 and accidentally let the last
+      // deployed snapshot pass through the assembly line a second time.
       rotateDeliveredInventory();
+      if (cachedSnapshot) {
+        if (cachedSnapshot._dayKey === localDayKey(new Date())) recordDeliveredInventory(cachedSnapshot);
+        else rememberPriorInventory(cachedSnapshot);
+      }
       [JSON.parse(localStorage.getItem("meanwhileFeedSnapshotV3") || "null"), JSON.parse(localStorage.getItem("meanwhileFeedSnapshotV2") || "null")].filter(Boolean).forEach(rememberPriorInventory);
       if (cachedSnapshot?._dayKey === localDayKey(new Date()) && cachedSnapshot?.gallery?.length >= BATCH_SIZE) { setData(cachedSnapshot); setEditionNote("Refreshing quietly"); }
     } catch {}
@@ -592,6 +608,11 @@ export default function Home() {
     const visibleWall = spreadAdjacentSources(wall.slice(0, batches * BATCH_SIZE));
     return Array.from({length: Math.ceil(visibleWall.length / BATCH_SIZE)}, (_, index) => visibleWall.slice(index * BATCH_SIZE, (index + 1) * BATCH_SIZE)).filter(batch => batch.length);
   }, [wall, batches]);
+  useEffect(() => {
+    if (!user || !data) return;
+    recordDeliveredInventory(data);
+    void syncDeliveredInventoryToCloud(data, user);
+  }, [data, user]);
   useEffect(() => { if (!wall.length) return; const visible = [...(data?.tickerStories || []), data?.goodNews, ...(data?.favorites || []), ...wall.slice(0, batches * BATCH_SIZE)].filter(Boolean), nowSeen = Date.now(), stories = storyHistory(), storyKeys = new Set(stories.flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean)), seenLedger = permanentSeenHashes(), newHistory = []; visible.filter(item => item.format !== "joy").forEach(item => { const keys = identityKeys(item), id = itemKey(item); if (!id) return; identityHashes(item).forEach(hash => seenLedger.add(hash)); if (keys.some(key => storyKeys.has(key)) || storyKeys.has(id)) return; stories.push({id,keys,ts:nowSeen}); newHistory.push({user_id:user?.id, story_key:id, identity_keys:keys, story:item, last_seen_at:new Date(nowSeen).toISOString()}); storyKeys.add(id); keys.forEach(key => storyKeys.add(key)); }); writeSeenLedger(seenLedger); try { localStorage.setItem(STORY_HISTORY_KEY, JSON.stringify(stories.slice(-STORY_HISTORY_LIMIT))); } catch {} if (supabase && user && newHistory.length) supabase.from("story_history").upsert(newHistory, {onConflict:"user_id,story_key"}); const media = recentHistory("betterStartReaderMediaHistory"), mediaIds = new Set(media.map(entry => entry.id)); visible.filter(item => item.videoId && !mediaIds.has(item.videoId)).forEach(item => media.push({id: item.videoId, ts: nowSeen})); localStorage.setItem("betterStartReaderMediaHistory", JSON.stringify(media.slice(-300))); const joy = recentHistory("betterStartReaderJoyHistory"), joyIds = new Set(joy.map(entry => entry.signature)); visible.filter(item => item.signature && !joyIds.has(item.signature)).forEach(item => joy.push({signature: item.signature, ts:nowSeen})); localStorage.setItem("betterStartReaderJoyHistory", JSON.stringify(joy.slice(-300))); }, [data, wall, batches, user]);
   const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartReaderFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartReaderFeedback", JSON.stringify(ratings.slice(-250))); if (supabase && user) supabase.from("story_feedback").insert({user_id:user.id, story_key:itemKey(item), action, story:item}); };
   const toggleSave = item => setSaved(current => { const exists = current.some(savedItem => itemKey(savedItem) === itemKey(item)), next = exists ? current.filter(savedItem => itemKey(savedItem) !== itemKey(item)) : [{...item, savedAt: Date.now()}, ...current]; localStorage.setItem("betterStartReaderSaved", JSON.stringify(next.slice(0, 200))); if (supabase && user) { if (exists) supabase.from("saved_stories").delete().eq("user_id", user.id).eq("story_key", itemKey(item)); else supabase.from("saved_stories").upsert({user_id:user.id, story_key:itemKey(item), story:item}); } return next.slice(0, 200); });
