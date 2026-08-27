@@ -11,6 +11,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // marked automatically prepared (but never viewed) cards as permanently seen.
 const STORY_HISTORY_KEY = "betterStartReaderStoryHistoryV3";
 const SEEN_STORY_LEDGER_KEY = "meanwhileSeenStoryHashesV3";
+const DELIVERED_INVENTORY_LEDGER_KEY = "meanwhileDeliveredInventoryHashesV1";
 // V2 discards the NASA-heavy snapshot produced before mixed-content image
 // URLs were upgraded and visual diversity was enforced.
 const FEED_SNAPSHOT_KEY = "meanwhileFeedSnapshotV4";
@@ -250,10 +251,17 @@ const itemKey = item => canonicalStoryUrl(item?.canonicalUrl || item?.url) || it
 const savedPlaces = () => { try { const value = JSON.parse(localStorage.getItem("betterStartReaderPlaces") || "[]"); return Array.isArray(value) ? value.slice(0, 20).join("|") : ""; } catch { return ""; } };
 const storyHistory = () => { try { const value = JSON.parse(localStorage.getItem(STORY_HISTORY_KEY) || "[]"); return Array.isArray(value) ? value : []; } catch { return []; } };
 const storyHistoryKeys = () => new Set(storyHistory().flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean));
-const recentStoryAvoidance = () => {
+const deliveredInventoryState = () => { try { const value = JSON.parse(localStorage.getItem(DELIVERED_INVENTORY_LEDGER_KEY) || "null"); if (Array.isArray(value)) return {day:localDayKey(new Date()),current:[],prior:value}; return value && typeof value === "object" ? {day:value.day || localDayKey(new Date()),current:Array.isArray(value.current) ? value.current : [],prior:Array.isArray(value.prior) ? value.prior : []} : {day:localDayKey(new Date()),current:[],prior:[]}; } catch { return {day:localDayKey(new Date()),current:[],prior:[]}; } };
+const writeDeliveredInventory = state => { try { localStorage.setItem(DELIVERED_INVENTORY_LEDGER_KEY, JSON.stringify({...state,current:[...new Set(state.current)].slice(-SEEN_STORY_LEDGER_LIMIT),prior:[...new Set(state.prior)].slice(-SEEN_STORY_LEDGER_LIMIT)})); } catch {} };
+const rotateDeliveredInventory = () => { const state = deliveredInventoryState(), today = localDayKey(new Date()); if (state.day !== today) { state.prior = [...new Set([...state.prior, ...state.current])].slice(-SEEN_STORY_LEDGER_LIMIT); state.current = []; state.day = today; writeDeliveredInventory(state); } return state; };
+const deliveredInventoryHashes = (includeCurrent = false) => { const state = rotateDeliveredInventory(); return new Set(includeCurrent ? [...state.prior, ...state.current] : state.prior); };
+const editionInventoryItems = edition => [...(edition?.tickerStories || []), edition?.goodNews, ...(edition?.favorites || []), ...(edition?.important || []), ...(edition?.gallery || []), ...(edition?.media || []), ...(edition?.serendipity || []), ...(edition?.visualReserve || [])].filter(Boolean);
+const recordDeliveredInventory = edition => { const state = rotateDeliveredInventory(), current = new Set(state.current); editionInventoryItems(edition).forEach(item => identityHashes(item).forEach(hash => current.add(hash))); state.current = [...current]; writeDeliveredInventory(state); };
+const rememberPriorInventory = edition => { const state = rotateDeliveredInventory(), prior = new Set(state.prior); editionInventoryItems(edition).forEach(item => identityHashes(item).forEach(hash => prior.add(hash))); state.prior = [...prior]; writeDeliveredInventory(state); };
+const recentStoryAvoidance = (includeCurrent = false) => {
   // Compact hashes let the complete permanent ledger travel in the POST body
   // without repeatedly serializing full titles, URLs and image records.
-  return [...permanentSeenHashes()].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
+  return [...new Set([...permanentSeenHashes(), ...deliveredInventoryHashes(includeCurrent)])].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
 };
 const localDayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const requestFeed = async payload => {
@@ -267,7 +275,7 @@ const filterEditionGlobally = next => {
   // captions cannot return with a punctuation, date or wording variation.
   const history = storyHistory();
   const seen = new Set();
-  const seenHashes = permanentSeenHashes();
+  const seenHashes = new Set([...permanentSeenHashes(), ...deliveredInventoryHashes()]);
   const priorTitles = history.flatMap(entry => entry.keys || []).filter(key => key.startsWith("title:")).map(key => key.slice(6));
   const take = items => claimUnique((items || []).filter(item => {
     if (identityHashes(item).some(hash => seenHashes.has(hash))) return false;
@@ -519,6 +527,10 @@ export default function Home() {
     let cachedSnapshot = null;
     try {
       cachedSnapshot = JSON.parse(localStorage.getItem(FEED_SNAPSHOT_KEY) || "null");
+      // Migrate previously delivered benches too, so deploying this audit does
+      // not grant yesterday's V2/V3 cards one final repeat.
+      rotateDeliveredInventory();
+      [JSON.parse(localStorage.getItem("meanwhileFeedSnapshotV3") || "null"), JSON.parse(localStorage.getItem("meanwhileFeedSnapshotV2") || "null")].filter(Boolean).forEach(rememberPriorInventory);
       if (cachedSnapshot?._dayKey === localDayKey(new Date()) && cachedSnapshot?.gallery?.length >= BATCH_SIZE) { setData(cachedSnapshot); setEditionNote("Refreshing quietly"); }
     } catch {}
     setShowWelcome(localStorage.getItem("meanwhileWelcomeSeenV1") !== "yes");
@@ -535,13 +547,14 @@ export default function Home() {
         const priorInventory = hardRefresh ? cachedSnapshot : force ? dataRef.current : null;
         const inventoryItems = priorInventory ? [...(priorInventory.tickerStories || []), priorInventory.goodNews, ...(priorInventory.favorites || []), ...(priorInventory.gallery || []), ...(priorInventory.media || []), ...(priorInventory.serendipity || [])].filter(Boolean) : [];
         const inventoryAvoidance = inventoryItems.flatMap(item => [itemKey(item), ...identityKeys(item)]).map(stableHash);
-        const avoidStories = [...new Set([...recentStoryAvoidance().split(",").filter(Boolean), ...inventoryAvoidance])].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
+        const avoidStories = [...new Set([...recentStoryAvoidance(force).split(",").filter(Boolean), ...inventoryAvoidance])].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
         // First paint waits for one balanced edition only. The background
         // queue then grows invisibly to 100, without blocking the front door.
         const editions = [await requestFeed({visit,avoid,avoidStories,places,interests:profileTerms,editionName:activeProfile?.title || ""})];
         localStorage.setItem("betterStartReaderDay", today); setJoyHistory(recentHistory("betterStartReaderJoyHistory"));
         if (preserve) setData(previous => {
           const prepared = {...prepareEdition(editions[0], previous, !hardRefresh && !force), _dayKey:today};
+          recordDeliveredInventory(prepared);
           try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
           return prepared;
         });
@@ -550,6 +563,7 @@ export default function Home() {
           const reserved = [...(primary?.tickerStories || []), primary?.goodNews, ...(primary?.favorites || [])].filter(Boolean);
           const gallery = claimSessionUnique(clean.flatMap(edition => edition?.gallery || []), reserved).slice(0, 140);
           const prepared = {...primary, gallery:stampNew(gallery), _dayKey:today};
+          recordDeliveredInventory(prepared);
           try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
           setData(prepared);
         }
@@ -613,7 +627,7 @@ export default function Home() {
         ...(fresh?.media || [])
       ], currentItems);
       if (additions.length) {
-        setData(previous => ({...previous, gallery:stampNew([...(previous?.gallery || []), ...additions])})); setQueueExhausted(false);
+        setData(previous => { const prepared = {...previous, gallery:stampNew([...(previous?.gallery || []), ...additions])}; recordDeliveredInventory(prepared); return prepared; }); setQueueExhausted(false);
         if (revealWhenReadyRef.current) { revealWhenReadyRef.current = false; setBatches(count => count + 1); }
       }
       else {

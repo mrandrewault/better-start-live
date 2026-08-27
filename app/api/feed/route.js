@@ -239,7 +239,7 @@ function composeVisualWindows(items, identity, count = 140, blockSize = 20) {
   const globallyLimitedCounts = new Map();
   const globallyAllowed = item => {
     const source = normalizeSource(item.source);
-    return !/^(?:nasa|jstor daily)$/.test(source) || (globallyLimitedCounts.get(source) || 0) < 1;
+    return !/^(?:nasa|jstor daily|colossal)$/.test(source) || (globallyLimitedCounts.get(source) || 0) < 1;
   };
   const takeBest = predicate => {
     const choices = pool.filter(predicate).sort((a, b) => a._visualPriority - b._visualPriority);
@@ -247,7 +247,7 @@ function composeVisualWindows(items, identity, count = 140, blockSize = 20) {
     if (!winner) return null;
     pool.splice(pool.indexOf(winner), 1);
     const source = normalizeSource(winner.source);
-    if (/^(?:nasa|jstor daily)$/.test(source)) globallyLimitedCounts.set(source, (globallyLimitedCounts.get(source) || 0) + 1);
+    if (/^(?:nasa|jstor daily|colossal)$/.test(source)) globallyLimitedCounts.set(source, (globallyLimitedCounts.get(source) || 0) + 1);
     const {_visualPriority, ...story} = winner;
     return story;
   };
@@ -358,7 +358,11 @@ function isFreshLocal(item) {
   if (/^nyt\b/i.test(item.source || "")) return age <= 1.5;
   if (/^jstor daily$/i.test(item.source || "")) return age <= 3;
   if (/^nasa$/i.test(item.source || "")) return age <= 2;
-  return age <= (item.sourcePack ? 120 : 45);
+  if (/^colossal$/i.test(item.source || "")) return age <= 2;
+  // Universal source audit: no ordinary feed can fill a current edition from
+  // a months-old archive. Specialist desks get a slightly wider weekly-publisher
+  // window, while standing feeds must furnish work from the last two weeks.
+  return age <= (item.sourcePack ? 45 : 30);
 }
 function isGoodNews(item) {
   const value = `${item.title || ""} ${item.summary || ""}`;
@@ -577,7 +581,7 @@ function balancedMagazine(candidates, count, interests = [], random = Math.rando
     const hardLaneLimit = item => item.mixLane === "sports" ? (sportsAllowedThisWindow ? 1 : 0) : item.mixLane === "fashion" ? 1 : 2;
     const obeysSourceAndFormatCaps = item => {
       const source = normalizeSource(item.source), pageCount = sourceCounts.get(source) || 0;
-      const pageLimit = /^(?:nasa|jstor daily)$/.test(source) ? 1 : 5;
+      const pageLimit = /^(?:nasa|jstor daily|colossal)$/.test(source) ? 1 : 5;
       const visual = item.image || item.videoId;
       return pageCount < pageLimit && !((item.visualShelf && blockVisualShelfCount >= 2) || blockSourceCount(source) >= 2 || (visual && (blockVisualSourceCount(source) >= 2 || blockVisualLaneCount(item.mixLane) >= 2)));
     };
@@ -656,7 +660,7 @@ function balancedMagazine(candidates, count, interests = [], random = Math.rando
 function completeMagazineBench(selected, candidates, count = 140, random = Math.random) {
   const result = [], seededSourceCounts = new Map();
   unique(selected).forEach(item => {
-    const source = normalizeSource(item.source), limit = /^(?:nasa|jstor daily)$/.test(source) ? 1 : 8;
+    const source = normalizeSource(item.source), limit = /^(?:nasa|jstor daily|colossal)$/.test(source) ? 1 : 8;
     if ((seededSourceCounts.get(source) || 0) >= limit) return;
     seededSourceCounts.set(source, (seededSourceCounts.get(source) || 0) + 1); result.push(item);
   });
@@ -676,7 +680,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
       if (lane === "sports" && (!sportsAllowed || laneCount("sports") >= 1 || !humanInterestSports(item))) return false;
       if (lane === "fashion" && laneCount("fashion") >= 1) return false;
       if (laneCount(lane) >= 3 || sourceCount(source) >= 2) return false;
-      if (/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1) return false;
+      if (/^(?:nasa|jstor daily|colossal)$/.test(source) && globalSourceCount(source) >= 1) return false;
       if ((item.image || item.videoId) && (visualSourceCount(source) >= 2 || visualLaneCount(lane) >= 2)) return false;
       if (!item.independentPublisher && mainstreamCount >= 2) return false;
       return true;
@@ -687,7 +691,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
       // The fallback may relax the ideal subject mix, but never the rules that
       // prevent one image-rich publisher (especially NASA) from taking over.
       return lane !== "sports"
-        && !(/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1)
+        && !(/^(?:nasa|jstor daily|colossal)$/.test(source) && globalSourceCount(source) >= 1)
         && sourceCount(source) < 3
         && (!visual || (visualSourceCount(source) < 2 && visualLaneCount(lane) < 2))
         && (item.independentPublisher || mainstreamCount < 2);
@@ -695,7 +699,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
     const depthFallback = remaining.filter(item => {
       const lane = item.mixLane || contentLane(item), source = normalizeSource(item.source);
       return lane !== "sports"
-        && !(/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1)
+        && !(/^(?:nasa|jstor daily|colossal)$/.test(source) && globalSourceCount(source) >= 1)
         && sourceCount(source) < 4
         && (item.independentPublisher || mainstreamCount < 2);
     });
@@ -848,7 +852,7 @@ async function feedResponse(params) {
   const limitedSourceCounts = new Map();
   all = all.filter(item => {
     const source = normalizeSource(item.source);
-    if (!/^(?:nasa|jstor daily)$/.test(source)) return true;
+    if (!/^(?:nasa|jstor daily|colossal)$/.test(source)) return true;
     if ((limitedSourceCounts.get(source) || 0) >= 1) return false;
     limitedSourceCounts.set(source, 1); return true;
   });
@@ -943,6 +947,13 @@ async function feedResponse(params) {
   // those removals cannot quietly push the remaining pictures to the bottom.
   gallery.splice(0, gallery.length, ...composeVisualWindows(gallery, editorialIdentity, gallery.length, 20));
   gallery.splice(0, gallery.length, ...enforceVisualShare(gallery, .75, 100));
+  if (gallery.length < 100) {
+    const finalKeys = new Set(gallery.map(item => canonicalUrl(item.url)));
+    gallery.push(...selectedMagazine
+      .filter(item => !finalKeys.has(canonicalUrl(item.url)))
+      .sort((a, b) => Number(Boolean(b.image || b.videoId)) - Number(Boolean(a.image || a.videoId)))
+      .slice(0, 100 - gallery.length));
+  }
   const galleryKeys = new Set(gallery.map(item => canonicalUrl(item.url)));
   const visualReserve = allVisualShelf.slice(56).filter(item => !galleryKeys.has(canonicalUrl(item.url))).slice(0, 24).map(item => ({...item, canonicalUrl:canonicalUrl(item.url)}));
   // Serendipity is composed from what remains after the primary magazine. It
