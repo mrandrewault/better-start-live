@@ -2,10 +2,8 @@ import './globals.css';
 import './interview.css';
 
 export const metadata = {
-  title: "Meanwhile — Andrew’s Edition",
-  description: "Andrew’s personalized, rage-free wall of good news, discovery and delight",
-  openGraph: {title:"Meanwhile — Andrew’s Edition",description:"Rage-free news, discovery and good times.",siteName:"Meanwhile",type:"website"},
-  twitter: {card:"summary_large_image",title:"Meanwhile — Andrew’s Edition",description:"Rage-free news, discovery and good times."}
+  title: "Meanwhile",
+  description: "A playful, rage-free wall of good news, discovery and delight"
 };
 
 export default function RootLayout({ children }) {

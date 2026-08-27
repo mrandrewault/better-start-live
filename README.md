@@ -1,12 +1,42 @@
-# Meanwhile 11 — Andrew’s Edition · Global Freshness + Source Rotation
+# Meanwhile 21 — Balanced Variety Fix
 
-Videos, stories, ticker items and visual-shelf entries now use one shared identity contract. YouTube video IDs participate in the same edition-wide exclusion history as canonical URLs and normalized titles, so a watched KQED or other video cannot immediately return through a different page section. Feed composition also caps source concentration and strongly prefers an eligible publication from the same editorial pool when a familiar source has exhausted its fresh material. Ordinary feed stories are limited to 45 days and specialist-source items to 120 days, preventing stale archive pieces such as the recurring Martin Amis item from becoming permanent fixtures.
+This revision fixes the rendered-feed photography flood found in Meanwhile 20.
+Good Stuff now receives the full editorial inventory before serendipity is
+reserved; visual-shelf cards are capped at two per 20-card window; individual
+publications are capped at two per window; and failed images fall back to an
+intentional text card instead of replacing the story with unrelated shelf
+photography. Generic editions also draw from a small set of specialist fashion,
+food, sports, business, making, science and community desks so the target mix
+has genuine reporting to choose from.
 
-This is the next version of Andrew’s Color Hunt edition. It preserves the complete Andrew feed and applies the same masthead legibility contract as the personalized reader: one palette-aware color per letter, controlled chroma and lightness, strong paper contrast, and visible separation between neighboring letters. Stacked wordmarks and multiply blending have been removed so **MEANWHILE** cannot collapse into a dark blur.
+This edition makes the subject mix a first-class editorial system. Every
+20-story window targets 5% arts, animals, international, human kindness, human
+ingenuity, music, sports, money/business, technology/innovation and
+home/gardens/design; 10% each fashion, science, travel, food and lively grab
+bag. These are composition targets rather than permission to publish weak work.
+
+Photography and video are formats, not subjects. A photograph of a restaurant
+is filed as food; a travel film is filed as travel. The opening avoids more than
+two closely related subjects in succession and caps pure art/photography shelf
+pieces at two. If a desk lacks a worthy current story, its space is assigned to
+an available underrepresented desk instead of the largest source pile.
+
+Personalized editions retain the same broad-world foundation. Strong interest
+signals may raise a subject to as much as 25% of a 20-story window, but every
+other available desk keeps representation. The feed response includes its
+target and actual first-20 composition for editorial auditing.
+
+## Foundation inherited from Meanwhile 19
+
+Videos, stories, ticker items and visual-shelf entries now use one shared identity contract. YouTube video IDs participate in the same edition-wide exclusion history as canonical URLs and normalized titles, so a watched KQED or other video cannot immediately return through a different page section. Feed composition also caps source concentration and strongly prefers an eligible publication from the same editorial pool when a familiar source has exhausted its fresh material. Ordinary feed stories are limited to 45 days and specialist-source items to 120 days, preventing stale archive pieces from becoming permanent fixtures.
 
 This build adds Andrew's 40 deduplicated Color Hunt families in high rotation, plus eight new Meanwhile palettes inspired by them. Each reload advances the page and centered Vignelli masthead together. A contrast gate repairs overly pale or dark letter colors and introduces a harmonious accent when a palette is too narrow, keeping every **MEANWHILE** impression legible.
 
-Centered masthead option 4: overlapping, palette-aware wordmarks inspired by Vignelli. The personalizer and reader below the masthead are unchanged.
+This build keeps the complete generic edition and four-step personalizer, while introducing the centered, overlapping Vignelli-inspired **Meanwhile** signature. Its three letter impressions are driven by the same four-color palette as the page, so every reload advances both the site and masthead together to a new coordinated palette.
+
+The generic masthead no longer includes the word **Reader**. Source spacing is now enforced after the final visual-frame arrangement, so desktop layout changes cannot create same-publication neighbors in the mobile single-column reading order. The same separation pass covers Bright Spots, Good Stuff, Good News With Consequence and You Didn’t Ask For This.
+
+The **Add More Stuff I Didn’t Ask For** control now remains available even after the initial surprise shelf is exhausted. It first reveals any unused surprises already loaded, then requests a fresh deduplicated batch from the feed instead of disappearing.
 
 ## Refresh and public-space safety
 
@@ -16,11 +46,11 @@ Centered masthead option 4: overlapping, palette-aware wordmarks inspired by Vig
 - Saved stories remain available in the Saved shelf but are never recycled into the live edition.
 - Public-space safety filtering excludes nudity and sexually explicit material, including artistic imagery, using story and media metadata.
 
-This is Andrew’s newest working edition, rebranded as **Meanwhile**. It preserves the compact useful-information ticker and all visual-quality, composition, safety, global no-repeat memory, sharing and responsive-layout improvements from the preceding build.
+This build includes the generic edition and the four-step edition customizer while preserving the established feed, safety, visual-quality, global no-repeat memory, sharing and responsive-layout behavior.
 
 This version makes photography and playable media a composition requirement rather than a ranking preference.
 
-## Foundation carried into Meanwhile 02
+## Foundation carried into Meanwhile 01
 
 - Adds a browser-side image quality gate: imagery must have a long edge of at least 900px, a short edge of at least 500px and at least 700,000 total pixels.
 - A broken or undersized image is never enlarged into a feature frame.
@@ -91,12 +121,12 @@ This version makes photography and playable media a composition requirement rath
 - Specialist stories are labeled quietly inside the wall.
 - A compact strip beneath the masthead explains which editorial desks are contributing to the edition.
 - New interview choices cover projects, gardening, boats, sailing and history; deeper choices cover yoga and boatbuilding.
-- Generic Reader behavior is unchanged when no personal profile exists.
+- Generic edition behavior is unchanged when no personal profile exists.
 - All established safety, deduplication, source-spacing, refresh, global no-repeat memory, layout, mobile, Save, Share and Joy Bench rules remain active.
 
 ## Login-free deployment
 
-1. Create a new GitHub repository named `meanwhile-andrews-edition` (or update the repository you already use for Andrew’s Edition).
+1. Create a new GitHub repository named `meanwhile-reader` (or update the repository you already use for the generic/customizable edition).
 2. Upload the **contents** of this folder.
 3. In Vercel choose **Add New → Project** and import that repository.
 4. Leave the defaults unchanged and click **Deploy**.

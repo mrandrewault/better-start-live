@@ -1,24 +1,95 @@
 "use client";
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
 import {EDITION_PALETTES, mastheadPalette} from "./palettes";
+import {supabase, supabaseConfigured} from "../lib/supabase";
 
 const BATCH_SIZE = 25;
-const SERENDIPITY_BATCH_SIZE = 9;
 const EDITION_MS = 2 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const PROFILE_KEY = "betterStartPersonalProfileV1";
-const STORY_HISTORY_KEY = "betterStartReaderStoryHistory";
-const STORY_HISTORY_LIMIT = 5000;
-const ANDREW_PROFILE = {
-  version: 2,
-  name: "Andrew",
-  title: "Meanwhile — Andrew’s Edition",
-  broadInterests: ["Music", "Photography", "Film", "Books", "Art + design", "Science + nature", "Food", "Travel", "Nature + outdoors", "Making things"],
-  specificInterests: ["Jazz", "Live music", "Street photography", "Film cameras", "Classic film", "Documentaries", "Architecture", "Museums", "Space", "Hiking", "Restaurants", "Woodworking"],
-  details: ["Music history", "Photography books", "Independent magazines", "Beautiful archives", "Classic cars", "Sailing", "Creative studios", "How things work"],
-  anythingElse: ["Dylan", "Phish", "The Rolling Stones", "pianos", "synthesizers", "New Canaan", "comedy", "human achievement"]
+// V3 intentionally leaves behind the poisoned ledger written by builds that
+// marked automatically prepared (but never viewed) cards as permanently seen.
+const STORY_HISTORY_KEY = "betterStartReaderStoryHistoryV3";
+const SEEN_STORY_LEDGER_KEY = "meanwhileSeenStoryHashesV3";
+// V2 discards the NASA-heavy snapshot produced before mixed-content image
+// URLs were upgraded and visual diversity was enforced.
+const FEED_SNAPSHOT_KEY = "meanwhileFeedSnapshotV3";
+const STORY_HISTORY_LIMIT = 1500;
+const SEEN_STORY_LEDGER_LIMIT = 50000;
+const DAYPART_MESSAGES = {
+  morning:[
+    "Let’s start the day off rage-free, shall we?",
+    "Mornings are for nice things, not rage.",
+    "This is a rage-free zone.",
+    "Oh, what a beautiful rage-bait-free morning.",
+    "Let’s ease into the day with good things.",
+    "Ease into the day with more ease.",
+    "No rage in the morning, please.",
+    "Not everything is crazy and terrible.",
+    "There are lots of good things happening. Here are some of them.",
+    "Good days are built on good mornings.",
+    "The world is already yelling. We don’t have to.",
+    "Coffee first. Outrage never.",
+    "Good morning. The algorithm can wait."
+  ],
+  afternoon:[
+    "Enjoy a little mental recess.",
+    "Take a break from the crazy.",
+    "World got you down? Play around here for a while.",
+    "Take a break for a while.",
+    "Now’s as good a time as any to take a break.",
+    "Enjoy more joy.",
+    "Enjoy some joy.",
+    "A small, sanctioned escape from the discourse.",
+    "Consider this your browser’s quiet room.",
+    "Nothing urgent here. That’s the point."
+  ],
+  evening:[
+    "Sweet dreams are made of this. Literally.",
+    "A softer landing for your day.",
+    "Take it easier.",
+    "Wind down with some good news.",
+    "Leave the bad news behind.",
+    "This is a rage-bait-free safe space.",
+    "Nighttime’s the right time for feeling good. Or at least reading about good.",
+    "The doomscroll has closed for the evening.",
+    "Put the outrage to bed before you.",
+    "Some news can wait until never."
+  ]
 };
+const SMALL_DELIGHTS = [
+  "Octopuses have three hearts.",
+  "A group of flamingos is called a flamboyance.",
+  "The earthy smell after rain has a name: petrichor.",
+  "Bananas are berries. Strawberries are not.",
+  "Sea otters sometimes hold hands while sleeping so they do not drift apart.",
+  "The dot over a lowercase i or j is called a tittle.",
+  "A day on Venus lasts longer than a year on Venus.",
+  "Scotland’s national animal is the unicorn.",
+  "The telephone helped turn ‘hello’ into an everyday greeting.",
+  "What ordinary object in your home has the best design?",
+  "Somewhere nearby, someone is learning how to do something for the first time.",
+  "A well-made chair is a small piece of architecture.",
+  "The shortest distance between two people may be a shared joke.",
+  "Honey can remain edible for an extraordinarily long time when properly sealed.",
+  "Butterflies taste with receptors on their feet.",
+  "The tiny pocket on blue jeans was originally made for a pocket watch.",
+  "What skill would you happily practice for ten quiet minutes today?",
+  "Libraries lend more than books: many now offer tools, instruments and museum passes.",
+  "The word ‘muscle’ comes from a Latin word meaning ‘little mouse.’",
+  "There are more possible chess games than atoms in the observable universe.",
+  "The first modern public aquarium opened in London in 1853.",
+  "A collection of crows is traditionally called a murder; a collection of ravens, an unkindness.",
+  "What would make today feel five percent more interesting?",
+  "Every map is also a record of what its maker thought was important.",
+  "A song you have forgotten is still waiting somewhere to surprise you.",
+  "The grooves on a vinyl record form one continuous spiral.",
+  "The oldest known recipes were written on clay tablets.",
+  "Tree roots can form partnerships with vast underground fungal networks.",
+  "A jiffy is an informal word, but scientists also use it for several very short units of time.",
+  "What is the nicest sound within earshot right now?"
+];
+const PROFILE_KEY = "betterStartPersonalProfileV1";
 const hexToHsl = hex => {
   const value = hex.replace("#", ""), r = parseInt(value.slice(0, 2), 16) / 255, g = parseInt(value.slice(2, 4), 16) / 255, b = parseInt(value.slice(4, 6), 16) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min, lightness = (max + min) / 2;
@@ -39,18 +110,100 @@ const mixedInk = (position = 0, palette = EDITION_PALETTES[0]) => {
 };
 const categoryClass = section => `cat-${(section || "news").toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-|-$)/g, "")}`;
 const normalizedIdentityTitle = value => (value || "").toLowerCase().replace(/\b(the|a|an|and|or|but|to|of|for|in|on|at|with|from)\b/g, " ").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-const emergencyBlocked = /\b(trump|maga|maha|nazi|neo[- ]?nazi|white supremac|shooting|gunman|murder|war|terroris|rape|sexual abuse|suicide|overdose|deadly|killed|outrage|religious|anti[- ]?vax|ufc|mma|gambling|google pixel|samsung galaxy|android phone|jeff bezos|bmi|body fat|weight[- ]loss|being thin|obesity|overweight|porn(?:ography|ographic)?|nsfw|nud(?:e|ity)|naked|topless|full[- ]?frontal|genitals?|penis|vulva|vagina|erotic(?:a)?|sexually explicit)\b/i;
+const emergencyBlocked = /\b(trump|maga|maha|nazi|neo[- ]?nazi|white supremac|shooting|gunman|murder|war|terroris|rape|sexual abuse|suicide|overdose|deadly|killed|outrage|religious|christian nationalism|white nationalism|nationalis(?:m|t)|religious right|religious left|culture[- ]?war|conservative|liberal|left[- ]wing|right[- ]wing|partisan|ideology|ideological|activis(?:m|t)|advocacy|protest|legislation|legislature|policy debate|government|federal agency|immigration|abortion|gun rights?|gun control|book ban|school board|voting rights?|civil rights legislation|geopolitic|diploma(?:cy|tic)|sanctions?|anti[- ]?vax|ufc|mma|gambling|google pixel|samsung galaxy|android phone|jeff bezos|bmi|body fat|weight[- ]loss|being thin|obesity|overweight|porn(?:ography|ographic)?|nsfw|nud(?:e|ity)|naked|topless|full[- ]?frontal|genitals?|penis|vulva|vagina|erotic(?:a)?|sexually explicit|miami (?:fashion|swim) week|miami nightlife|swim week|bikini(?:s)?|micro[- ]?bikini|thong(?:s)?|lingerie|underwear runway|swimwear runway|see[- ]?through (?:dress|fashion|outfit)|sheer (?:dress|fashion|outfit))\b/i;
+const religionBlocked = /\b(?:religion|religious|faith(?:ful)?|christian(?:ity)?|catholic(?:ism)?|protestant(?:ism)?|evangelical(?:ism)?|jewish|judaism|muslim|islam(?:ic)?|hindu(?:ism)?|buddhis(?:m|t)|sikh(?:ism)?|mormon(?:ism)?|church|cathedral|chapel|synagogue|mosque|bible|biblical|torah|talmud|quran|koran|scripture|gospel|theology|clergy|priest|pastor|pope|papal|vatican|rabbi|imam|monk|nun|worship|sermon|congregation|parish|diocese|god|jesus|christ|messiah|allah|yahweh|zionis(?:m|t)|antisemiti(?:c|sm)|islamophobi(?:a|c))\b/i;
+const bannedSource = item => /(?:\b(?:nyt|new york times|espn)\b|(?:^|\.)(?:nytimes|espn)\.com\b)/i.test(`${item?.source || ""} ${item?.publisher || ""} ${item?.url || ""} ${item?.canonicalUrl || ""}`);
+const routineSportsBlocked = /\b(?:final score|box score|standings|power rankings?|depth chart|starting lineup|roster move|trade(?:d|s)?|free agen(?:t|cy)|draft pick|mock draft|contract extension|waiver|injury report|quarterback|wide receiver|running back|head coach|playoffs? odds|game recap|match recap|season opener|transfer portal)\b/i;
 const corporateAmazonBlocked = value => /\bamazon(?:'s)?\b/i.test(value) && !/\bamazon (?:rainforest|river|basin|forest|region|wildlife)\b/i.test(value);
-const identityKeys = item => [`url:${item?.canonicalUrl || item?.url || ""}`, `title:${item?.normalizedTitle || normalizedIdentityTitle(item?.title)}`, `image:${item?.image || ""}`, `video:${item?.videoId || ""}`].filter(key => !key.endsWith(":"));
+const titleFingerprint = value => normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 2).slice(0, 9).join(" ");
+const titleFamily = value => [...new Set(normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 3))].sort().slice(0, 14).join(" ");
+const retiredRepeat = /\b(?:james hetfield.*metallica|cis football (?:field|locations?)|runway magazine covers? celebrating 25th anniversary|rocky horror.*mad scientist|chanel iman.*runway.*2009|not all boredom is the same)\b/i;
+const educationCultureWarBlocked = /(?:\b(?:lgbtq?|transgender|gender identity|drag queen|pride)\b.{0,90}\b(?:child(?:ren)?|kids?|school|classroom|curriculum|education|library|books?|reading hour)\b|\b(?:child(?:ren)?|kids?|school|classroom|curriculum|education|library|books?|reading hour)\b.{0,90}\b(?:lgbtq?|transgender|gender identity|drag queen|pride)\b)/i;
+const titleWords = value => new Set(normalizedIdentityTitle(value).split(/\s+/).filter(word => word.length > 2).map(word => word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word));
+const nearSameTitle = (left, right) => {
+  const a = titleWords(left), b = titleWords(right);
+  if (a.size < 3 || b.size < 3) return false;
+  let shared = 0; a.forEach(word => { if (b.has(word)) shared++; });
+  return shared >= 4 && shared / Math.min(a.size, b.size) >= .62;
+};
+const commonsAssetKey = item => {
+  const value = `${item?.url || ""} ${item?.image || ""}`, match = value.match(/(?:File:|File%3A|\/)([^/?#]+?\.(?:jpe?g|png|webp|gif|tiff?))(?:[/?#]|$)/i);
+  if (!match) return "";
+  try { return `commons:${decodeURIComponent(match[1]).toLowerCase().replace(/[_\s]+/g, "-")}`; } catch { return `commons:${match[1].toLowerCase()}`; }
+};
+const contentFingerprint = item => normalizedIdentityTitle(`${item?.title || ""} ${item?.summary || ""}`).split(/\s+/).filter(word => word.length > 2).slice(0, 24).join(" ");
+const canonicalStoryUrl = value => {
+  try {
+    const url = new URL(value || "", "https://meanwhile.invalid");
+    url.hash = ""; url.hostname = url.hostname.replace(/^www\./, "");
+    ["utm_source","utm_medium","utm_campaign","utm_term","utm_content","gclid","fbclid","output"].forEach(key => url.searchParams.delete(key));
+    url.pathname = url.pathname.replace(/\/$/, "") || "/";
+    return `${url.hostname}${url.pathname}${url.searchParams.toString() ? `?${url.searchParams}` : ""}`;
+  } catch { return String(value || "").replace(/\/$/, ""); }
+};
+const publisherStoryKey = item => {
+  const value = `${item?.canonicalUrl || item?.url || ""} ${item?.source || ""}`;
+  if (/\bnpr\b|npr\.org/i.test(value)) {
+    const id = value.match(/(?:nx-s1-|\/)(\d{6,})(?:[/?#\s-]|$)/i)?.[1];
+    if (id) return `npr:${id}`;
+    const slug = canonicalStoryUrl(item?.canonicalUrl || item?.url).split("/").filter(Boolean).at(-1)?.replace(/^\d+-/, "");
+    if (slug) return `npr-slug:${slug}`;
+  }
+  return "";
+};
+const identityKeys = item => [`url:${canonicalStoryUrl(item?.canonicalUrl || item?.url || "")}`, publisherStoryKey(item), `title:${item?.normalizedTitle || normalizedIdentityTitle(item?.title)}`, `topic:${titleFingerprint(item?.title)}`, `family:${titleFamily(item?.title)}`, `content:${contentFingerprint(item)}`, commonsAssetKey(item), `image:${item?.image || ""}`, `video:${item?.videoId || ""}`].filter(key => key && !key.endsWith(":"));
 const stableHash = value => { let hash = 2166136261; for (const char of String(value || "")) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(36); };
+const readSeenLedger = () => { try { const value = JSON.parse(localStorage.getItem(SEEN_STORY_LEDGER_KEY) || "[]"); return Array.isArray(value) ? value : []; } catch { return []; } };
+const identityHashes = item => [...new Set([itemKey(item), ...identityKeys(item)].filter(Boolean).map(stableHash))];
+const permanentSeenHashes = () => new Set([
+  ...readSeenLedger(),
+  ...storyHistory().flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean).map(stableHash)
+]);
+const writeSeenLedger = hashes => {
+  try { localStorage.setItem(SEEN_STORY_LEDGER_KEY, JSON.stringify([...hashes].slice(-SEEN_STORY_LEDGER_LIMIT))); return true; }
+  catch { return false; }
+};
 const claimUnique = (items = [], seen = new Set()) => items.filter(item => {
   const safetyText = `${item?.title || ""} ${item?.summary || ""} ${item?.source || ""} ${item?.section || ""}`;
-  if (emergencyBlocked.test(safetyText) || corporateAmazonBlocked(safetyText)) return false;
+  if (bannedSource(item) || routineSportsBlocked.test(safetyText) || emergencyBlocked.test(safetyText) || religionBlocked.test(safetyText) || educationCultureWarBlocked.test(safetyText) || corporateAmazonBlocked(safetyText) || retiredRepeat.test(safetyText)) return false;
   const keys = identityKeys(item);
   if (!keys.length || keys.some(key => seen.has(key))) return false;
   keys.forEach(key => seen.add(key));
   return true;
 });
+const claimSessionUnique = (items = [], reserved = []) => {
+  const seen = new Set(), titles = [];
+  reserved.filter(Boolean).forEach(item => {
+    identityKeys(item).forEach(key => seen.add(key));
+    if (item?.title) titles.push(item.title);
+  });
+  return (items || []).filter(item => {
+    const safetyText = `${item?.title || ""} ${item?.summary || ""} ${item?.source || ""} ${item?.section || ""}`;
+    const keys = identityKeys(item);
+    if (!keys.length || bannedSource(item) || routineSportsBlocked.test(safetyText) || emergencyBlocked.test(safetyText) || religionBlocked.test(safetyText) || educationCultureWarBlocked.test(safetyText) || corporateAmazonBlocked(safetyText) || retiredRepeat.test(safetyText)) return false;
+    if (keys.some(key => seen.has(key)) || titles.some(title => nearSameTitle(item?.title, title))) return false;
+    keys.forEach(key => seen.add(key)); titles.push(item.title || "");
+    return true;
+  });
+};
+const sourceKey = item => (item?.source || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+const spreadAdjacentSources = (items = [], initialPrevious = "") => {
+  const pool = [...items], result = [];
+  while (pool.length) {
+    const previous = sourceKey(result.at(-1)) || initialPrevious;
+    const recent = new Set(result.slice(-4).map(sourceKey).filter(Boolean));
+    let index = pool.findIndex(item => {
+      const source = sourceKey(item);
+      return !source || (source !== previous && !recent.has(source));
+    });
+    if (index < 0) index = pool.findIndex(item => !sourceKey(item) || sourceKey(item) !== previous);
+    // If the only remaining stories are from the immediately previous source,
+    // omit them from this display rather than violate the spacing promise.
+    if (index < 0) break;
+    result.push(pool.splice(index, 1)[0]);
+  }
+  return result;
+};
 const arrangeForFrames = items => {
   const arranged = [...items];
   // Large frames are reserved for photography, video, playable media or joy.
@@ -62,7 +215,20 @@ const arrangeForFrames = items => {
     const swap = compactSlots.find(candidate => needsVisualFrame(arranged[candidate]));
     if (swap !== undefined) [arranged[index], arranged[swap]] = [arranged[swap], arranged[index]];
   });
-  return arranged;
+  // This is the final DOM order used by mobile. Recheck source spacing here,
+  // after visual-frame swaps, so a layout pass can never reunite publications.
+  return spreadAdjacentSources(arranged);
+};
+const arrangeFrameClusters = (items = []) => {
+  const clusters = [], ordered = [];
+  for (let start = 0; start < items.length; start += 10) {
+    const arranged = arrangeForFrames(items.slice(start, start + 10));
+    const cluster = spreadAdjacentSources(arranged, sourceKey(ordered.at(-1)));
+    if (!cluster.length) continue;
+    clusters.push(cluster);
+    ordered.push(...cluster);
+  }
+  return clusters;
 };
 const rebalanceVisualBlocks = (items, blockSize = 10, ratio = .5) => {
   const arranged = [...items];
@@ -80,29 +246,82 @@ const rebalanceVisualBlocks = (items, blockSize = 10, ratio = .5) => {
   return arranged;
 };
 function age(date) { if (!date) return "From the shelf"; const hours = (Date.now() - new Date(date)) / 36e5; return hours < 1 ? `${Math.max(1, Math.round(hours * 60))} min ago` : hours < 24 ? `${Math.round(hours)} hr ago` : `${Math.round(hours / 24)}d ago`; }
-const itemKey = item => item.canonicalUrl || item.url || item.normalizedTitle || normalizedIdentityTitle(item.title);
+const itemKey = item => canonicalStoryUrl(item?.canonicalUrl || item?.url) || item?.normalizedTitle || normalizedIdentityTitle(item?.title);
 const savedPlaces = () => { try { const value = JSON.parse(localStorage.getItem("betterStartReaderPlaces") || "[]"); return Array.isArray(value) ? value.slice(0, 20).join("|") : ""; } catch { return ""; } };
 const storyHistory = () => { try { const value = JSON.parse(localStorage.getItem(STORY_HISTORY_KEY) || "[]"); return Array.isArray(value) ? value : []; } catch { return []; } };
 const storyHistoryKeys = () => new Set(storyHistory().flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean));
-const prioritizeUnseen = items => claimUnique(items || [], storyHistoryKeys());
+const recentStoryAvoidance = () => {
+  // Compact hashes let the complete permanent ledger travel in the POST body
+  // without repeatedly serializing full titles, URLs and image records.
+  return [...permanentSeenHashes()].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
+};
+const localDayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const requestFeed = async payload => {
+  const response = await fetch("/api/feed", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(payload), cache:"no-store"});
+  if (!response.ok) throw new Error(`Feed request failed: ${response.status}`);
+  return response.json();
+};
 const filterEditionGlobally = next => {
-  const seen = storyHistoryKeys(), take = items => claimUnique(items || [], seen);
+  // The browser is the final permanent gate. In addition to exact URL, image,
+  // Commons asset and title-family keys, compare titles fuzzily so archive
+  // captions cannot return with a punctuation, date or wording variation.
+  const history = storyHistory();
+  const seen = new Set();
+  const seenHashes = permanentSeenHashes();
+  const priorTitles = history.flatMap(entry => entry.keys || []).filter(key => key.startsWith("title:")).map(key => key.slice(6));
+  const take = items => claimUnique((items || []).filter(item => {
+    if (identityHashes(item).some(hash => seenHashes.has(hash))) return false;
+    if (priorTitles.some(title => nearSameTitle(item?.title, title))) return false;
+    identityHashes(item).forEach(hash => seenHashes.add(hash));
+    return true;
+  }), seen);
   const tickerStories = take(next?.tickerStories || (next?.ribbonFavorite ? [next.ribbonFavorite] : []));
-  return {...next, tickerStories, ribbonFavorite:tickerStories[0] || null, goodNews:take(next?.goodNews ? [next.goodNews] : [])[0] || null, favorites:take(next?.favorites), important:take(next?.important), gallery:take(next?.gallery), media:take(next?.media), serendipity:take(next?.serendipity), visualReserve:take(next?.visualReserve)};
+  const goodNews = take(next?.goodNews ? [next.goodNews] : [])[0] || null;
+  return {...next,
+    tickerStories,
+    ribbonFavorite:tickerStories[0] || null,
+    goodNews,
+    favorites:take(next?.favorites),
+    important:take(next?.important),
+    gallery:take(next?.gallery),
+    media:take(next?.media),
+    serendipity:take(next?.serendipity),
+    visualReserve:take(next?.visualReserve)
+  };
 };
 const blendPool = (previous = [], next = []) => {
   // Keep only one fifth of the current wall when the automatic two-hour
-  // refresh runs. A browser reload passes preserve=false and keeps nothing.
-  const keep = previous.filter(item => Date.now() - (item._firstShownAt || 0) < DAY_MS).slice(0, Math.ceil(Math.min(previous.length, next.length) * .20));
+  // refresh runs. Slow editorial desks never occupy that carry-over, and an
+  // item may survive only one refresh. This prevents the same "good" card
+  // from becoming permanent furniture while preserving a little continuity.
+  const keep = previous
+    .filter(item => Date.now() - (item._firstShownAt || 0) < DAY_MS)
+    .filter(item => !item._carriedOnce)
+    .filter(item => !/^nyt (?:arts|books)$/i.test(item.source || ""))
+    // The incoming edition already contains its single current fashion slot.
+    // Do not carry yesterday's runway card into the same twenty-card window.
+    .filter(item => item.mixLane !== "fashion")
+    .slice(0, Math.ceil(Math.min(previous.length, next.length) * .20))
+    .map(item => ({...item, _carriedOnce:true}));
   const used = new Set(keep.map(itemKey));
   return [...keep, ...next.filter(item => !used.has(itemKey(item)))].slice(0, next.length);
 };
 const stampNew = items => (items || []).map(item => ({...item, _firstShownAt:item._firstShownAt || Date.now()}));
-const prepareEdition = (next, previous, preserve) => { const clean = filterEditionGlobally(next); return {...clean, gallery:stampNew(preserve ? blendPool(previous?.gallery, clean.gallery) : clean.gallery), media:stampNew(preserve ? blendPool(previous?.media, clean.media) : clean.media), serendipity:stampNew(preserve ? blendPool(previous?.serendipity, clean.serendipity) : clean.serendipity)}; };
+const prepareEdition = (next, previous, preserve) => {
+  const clean = filterEditionGlobally(next);
+  return {...clean,
+    gallery:stampNew(preserve ? blendPool(previous?.gallery, clean.gallery) : clean.gallery),
+    media:stampNew(preserve ? blendPool(previous?.media, clean.media) : clean.media),
+    serendipity:stampNew(preserve ? blendPool(previous?.serendipity, clean.serendipity) : clean.serendipity)
+  };
+};
 function Feedback({item, onRate, onSave, onShare, saved}) { return <div className="controls" aria-label="Story feedback"><button onClick={() => onRate(item, "more")}>♡ More like this</button><button className={saved ? "savedControl" : ""} onClick={() => onSave(item)}>{saved ? "Saved ✓" : "Save"}</button><button onClick={() => onShare(item)}>Share</button><button onClick={() => onRate(item, "less")}>Less</button><button onClick={() => onRate(item, "political")}>Too political</button><button onClick={() => onRate(item, "depressing")}>Too depressing</button></div>; }
 function MeasuredTicker({children}) { const tickerRef = useRef(null); useLayoutEffect(() => { const ticker = tickerRef.current, track = ticker?.querySelector("i"); if (!ticker || !track) return; const setSpeed = () => track.style.setProperty("--ticker-duration", `${Math.max(18, track.scrollWidth / 33.3).toFixed(2)}s`); const observer = new ResizeObserver(setSpeed); observer.observe(ticker); observer.observe(track); requestAnimationFrame(setSpeed); document.fonts?.ready.then(setSpeed); return () => observer.disconnect(); }, [children]); return <span className="ticker" ref={tickerRef}><i>{children}</i></span>; }
 function RollingFact({label, children}) { return <div className="rollingFact"><b>{label}</b><MeasuredTicker>{children}</MeasuredTicker></div>; }
 function GoodNewsWire({items = []}) { return <div className="rollingFact newsWire"><b>Good news wire</b><MeasuredTicker>{items.length ? items.map((item, index) => <a href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl || item.url}>{item.title}<em>{item.source}</em>{index < items.length - 1 && <strong>✦</strong>}</a>) : "Finding several small reasons for optimism…"}</MeasuredTicker></div>; }
+function AccountPanel({user, email, setEmail, status, onSendLink, onSignOut, onClose}) {
+  return <div className="accountVeil" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section className="accountPanel" role="dialog" aria-modal="true" aria-labelledby="account-title"><button className="accountClose" onClick={onClose} aria-label="Close account window">×</button><span className="accountEyebrow">Your Meanwhile</span><h2 id="account-title">{user ? "You’re signed in." : "Keep your edition wherever you go."}</h2>{user ? <><p>Your preferences, saved stories and reading history can now follow you between devices.</p><strong className="accountAddress">{user.email}</strong><div className="accountActions"><button onClick={onClose}>Keep reading</button><button className="accountSecondary" onClick={onSignOut}>Sign out</button></div></> : <><p>Enter your email and we’ll send you a secure sign-in link. No password to remember.</p><form onSubmit={onSendLink}><label htmlFor="account-email">Email address</label><input id="account-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com"/><button type="submit">Email me a sign-in link</button></form></>}{status && <small className="accountStatus">{status}</small>}</section></div>;
+}
 const JOY_TYPES = ["chime", "question", "ripple", "doodle"];
 const QUESTIONS = [
   {question: "Which animal has fingerprints so similar to ours that they can confuse investigators?", answer: "The koala. Its fingerprints have loops and whorls remarkably like human ones."},
@@ -171,13 +390,15 @@ function JoyTile({item, index}) {
     {item.joyType === "doodle" && <PocketEtch variant={item.variant} />}
   </article>;
 }
-function Story({item, fallbackItem, index, paletteIndex = index, palette, onRate, onSave, onShare, saved}) {
+function Story({item, index, paletteIndex = index, palette, onRate, onSave, onShare, saved}) {
   const tileRef = useRef(null);
   const [imageRejected, setImageRejected] = useState(false);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { setImageRejected(false); setPlaying(false); }, [item.canonicalUrl]);
-  const replacement = imageRejected && fallbackItem ? fallbackItem : item;
-  const hasImage = !!replacement.image && !(imageRejected && !fallbackItem);
+  // A failed image changes the presentation, never the story. Replacing the
+  // entire card with visual-shelf photography would bypass the edition mix.
+  const replacement = item;
+  const hasImage = !!replacement.image && !imageRejected;
   const type = replacement.format || "article";
   const playable = type === "video" || type === "bandcamp";
   const playerUrl = type === "video" ? `https://www.youtube-nocookie.com/embed/${replacement.videoId}?autoplay=1&rel=0` : replacement.embedUrl;
@@ -219,28 +440,116 @@ function Story({item, fallbackItem, index, paletteIndex = index, palette, onRate
     return () => { observer.disconnect(); tile.querySelectorAll("img").forEach(image => image.removeEventListener("load", fitContents)); };
   }, [replacement.canonicalUrl, playing]);
   const inkStyle = !hasImage && !playable ? mixedInk(paletteIndex, palette) : undefined;
-  const textLength = `${replacement.title || ""} ${replacement.summary || ""}`.trim().length;
-  const densityClass = !hasImage && !playable && textLength <= 110 ? "tile-compact-text" : "";
-  return <article ref={tileRef} style={inkStyle} className={`tile tile-${type} tile-pattern-${index % 9} ${hasImage ? "tile-has-image" : "tile-no-image tile-text-art tile-mixed-ink"} ${densityClass} ${categoryClass(replacement.section)}`}>
+  return <article ref={tileRef} style={inkStyle} className={`tile tile-${type} tile-pattern-${index % 9} ${hasImage ? "tile-has-image" : "tile-no-image tile-text-art tile-mixed-ink"} ${categoryClass(replacement.section)}`}>
     {playable && playing ? <div className="inlinePlayer"><iframe src={playerUrl} title={replacement.title} allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen /></div> : hasImage && (playable ? <button className="imageLink mediaTrigger" onClick={() => setPlaying(true)} aria-label={`Play ${replacement.title}`}><img src={replacement.image} alt="" onLoad={inspectImage} onError={() => setImageRejected(true)} /><span className="play">▶</span></button> : <a className="imageLink" href={replacement.url} target="_blank" rel="noreferrer"><img src={replacement.image} alt="" onLoad={inspectImage} onError={() => setImageRejected(true)} /></a>)}
-    <div className="tileBody"><div className="kicker"><span>{replacement.section}</span><span>{type === "bandcamp" ? "New release" : type === "video" ? "Saved find" : age(replacement.date)}</span></div><h3><a href={replacement.url} target="_blank" rel="noreferrer">{replacement.title}</a></h3>{replacement.summary && type !== "visual" && <p>{replacement.summary.slice(0, type === "feature" ? 280 : 170)}</p>}<div className="meta">{replacement.sourcePackLabel && <i>From {replacement.sourcePackLabel}</i>}{replacement.source}</div><Feedback item={replacement} onRate={onRate} onSave={onSave} onShare={onShare} saved={saved}/></div>
+    <div className="tileBody"><div className="kicker"><span>{replacement.mixLabel || replacement.section}</span><span>{type === "bandcamp" ? "New release" : type === "video" ? "Saved find" : age(replacement.date)}</span></div><h3><a href={replacement.url} target="_blank" rel="noreferrer">{replacement.title}</a></h3>{replacement.summary && type !== "visual" && <p>{replacement.summary.slice(0, type === "feature" ? 280 : 170)}</p>}<div className="meta">{replacement.sourcePackLabel && <i>From {replacement.sourcePackLabel}</i>}{replacement.source}</div><Feedback item={replacement} onRate={onRate} onSave={onSave} onShare={onShare} saved={saved}/></div>
   </article>;
 }
 
 export default function Home() {
-  const [data, setData] = useState(null), [weather, setWeather] = useState(null), [batches, setBatches] = useState(1), [serendipityCount, setSerendipityCount] = useState(3), [serendipityLoading, setSerendipityLoading] = useState(false), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date()), [saved, setSaved] = useState([]), [showSaved, setShowSaved] = useState(false), [editionNote, setEditionNote] = useState("Composing edition"), [joyHistory, setJoyHistory] = useState([]), [profile, setProfile] = useState(null), [paletteIndex, setPaletteIndex] = useState(0);
+  const [data, setData] = useState(null), [batches, setBatches] = useState(1), [queueLoading, setQueueLoading] = useState(false), [queueExhausted, setQueueExhausted] = useState(false), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date()), [saved, setSaved] = useState([]), [showSaved, setShowSaved] = useState(false), [showWelcome, setShowWelcome] = useState(false), [showSaveNudge, setShowSaveNudge] = useState(false), [showGenericNudge, setShowGenericNudge] = useState(false), [theme, setTheme] = useState("light"), [editionNote, setEditionNote] = useState("Composing edition"), [joyHistory, setJoyHistory] = useState([]), [profile, setProfile] = useState(null), [paletteIndex, setPaletteIndex] = useState(0), [user, setUser] = useState(null), [accountOpen, setAccountOpen] = useState(false), [accountEmail, setAccountEmail] = useState(""), [accountStatus, setAccountStatus] = useState("");
+  const dataRef = useRef(null), queueRequestRef = useRef(false), loadMoreRef = useRef(null), revealWhenReadyRef = useRef(false), retryTimerRef = useRef(null);
+  useEffect(() => { dataRef.current = data; }, [data]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({data:{session}}) => setUser(session?.user || null));
+    const {data:{subscription}} = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
+    return () => subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (!profile || user || showWelcome || sessionStorage.getItem("meanwhileSaveNudgeSeen") === "yes") return;
+    const timer = setTimeout(() => setShowSaveNudge(true), 120000);
+    return () => clearTimeout(timer);
+  }, [profile, user, showWelcome]);
+  useEffect(() => {
+    if (profile || showWelcome || sessionStorage.getItem("meanwhileGenericNudgeSeen") === "yes") return;
+    const timer = setTimeout(() => setShowGenericNudge(true), 180000);
+    return () => clearTimeout(timer);
+  }, [profile, showWelcome]);
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("meanwhileTheme");
+    setTheme(savedTheme || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("meanwhileTheme", theme);
+  }, [theme]);
+  useEffect(() => {
+    if (!supabase || !user) return;
+    let active = true;
+    const hydrateAccount = async () => {
+      const localProfile = (() => { try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch { return null; } })();
+      const localSaved = (() => { try { return JSON.parse(localStorage.getItem("betterStartReaderSaved") || "[]"); } catch { return []; } })();
+      const localHistory = storyHistory();
+      const fetchCloudHistory = async () => {
+        const rows = [], pageSize = 1000;
+        for (let start = 0; start < SEEN_STORY_LEDGER_LIMIT; start += pageSize) {
+          const {data:page, error} = await supabase.from("story_history").select("story_key,identity_keys,last_seen_at").eq("user_id", user.id).order("last_seen_at", {ascending:false}).range(start, start + pageSize - 1);
+          if (error || !page?.length) break;
+          rows.push(...page);
+          if (page.length < pageSize) break;
+        }
+        return {data:rows};
+      };
+      const [{data:cloudProfile}, {data:cloudSaved}, {data:cloudHistory}] = await Promise.all([
+        supabase.from("profiles").select("preferences").eq("user_id", user.id).maybeSingle(),
+        supabase.from("saved_stories").select("story_key,story,saved_at").eq("user_id", user.id).order("saved_at", {ascending:false}).limit(200),
+        fetchCloudHistory()
+      ]);
+      if (!active) return;
+      const chosenProfile = cloudProfile?.preferences && Object.keys(cloudProfile.preferences).length ? cloudProfile.preferences : localProfile;
+      if (chosenProfile) { localStorage.setItem(PROFILE_KEY, JSON.stringify(chosenProfile)); setProfile(chosenProfile); }
+      if (!cloudProfile && localProfile) await supabase.from("profiles").upsert({user_id:user.id, preferences:localProfile});
+      const mergedSaved = [...(cloudSaved || []).map(row => ({...row.story, savedAt:new Date(row.saved_at).getTime()})), ...localSaved].filter((item,index,array) => array.findIndex(candidate => itemKey(candidate) === itemKey(item)) === index).slice(0,200);
+      localStorage.setItem("betterStartReaderSaved", JSON.stringify(mergedSaved)); setSaved(mergedSaved);
+      if (localSaved.length) await supabase.from("saved_stories").upsert(localSaved.map(story => ({user_id:user.id, story_key:itemKey(story), story})), {onConflict:"user_id,story_key"});
+      const completeHistory = [...localHistory, ...(cloudHistory || []).map(row => ({id:row.story_key, keys:row.identity_keys || [], ts:new Date(row.last_seen_at).getTime()}))].filter((entry,index,array) => array.findIndex(candidate => candidate.id === entry.id) === index);
+      const mergedHistory = completeHistory.slice(-STORY_HISTORY_LIMIT);
+      try { localStorage.setItem(STORY_HISTORY_KEY, JSON.stringify(mergedHistory)); } catch {}
+      const syncedLedger = permanentSeenHashes();
+      completeHistory.forEach(entry => [entry.id, ...(entry.keys || [])].filter(Boolean).forEach(value => syncedLedger.add(stableHash(value))));
+      writeSeenLedger(syncedLedger);
+      setAccountStatus("Your Meanwhile is synced.");
+    };
+    hydrateAccount();
+    return () => { active = false; };
+  }, [user]);
   useEffect(() => {
     setSaved(JSON.parse(localStorage.getItem("betterStartReaderSaved") || "[]")); setJoyHistory(recentHistory("betterStartReaderJoyHistory"));
+    try {
+      const snapshot = JSON.parse(localStorage.getItem(FEED_SNAPSHOT_KEY) || "null");
+      if (snapshot?.gallery?.length >= BATCH_SIZE) { setData(snapshot); setEditionNote("Refreshing quietly"); }
+    } catch {}
+    setShowWelcome(localStorage.getItem("meanwhileWelcomeSeenV1") !== "yes");
     const priorPalette = Number(localStorage.getItem("betterStartPaletteIndex") || "-1"), nextPalette = (priorPalette + 1) % EDITION_PALETTES.length;
     localStorage.setItem("betterStartPaletteIndex", String(nextPalette)); setPaletteIndex(nextPalette);
-    let activeProfile = ANDREW_PROFILE;
-    try { activeProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null") || ANDREW_PROFILE; } catch {}
+    let activeProfile = null;
+    try { activeProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch {}
     setProfile(activeProfile);
-    fetch("/api/weather", {cache:"no-store"}).then(response => response.ok ? response.json() : null).then(value => { if (value && !value.error) setWeather(value); }).catch(() => {});
     let lastLoad = Date.now();
     const loadEdition = async preserve => {
-      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`, mediaHistory = recentHistory("betterStartReaderMediaHistory"), priorStories = storyHistory(), avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(","), avoidStories = [...new Set(priorStories.flatMap(entry => [entry.id, ...(entry.keys || [])]).map(stableHash))].slice(-900).join(","), places = savedPlaces(), profileTerms = activeProfile ? [...(activeProfile.broadInterests || []), ...(activeProfile.specificInterests || []), ...(activeProfile.details || []), ...(activeProfile.anythingElse || [])].slice(0, 48).join("|") : "";
-      try { const today = new Date().toISOString().slice(0, 10), priorDay = localStorage.getItem("betterStartReaderDay"), hardRefresh = priorDay !== today; const next = await (await fetch(`/api/feed?visit=${encodeURIComponent(visit)}&avoid=${encodeURIComponent(avoid)}&avoidStories=${encodeURIComponent(avoidStories)}&places=${encodeURIComponent(places)}&interests=${encodeURIComponent(profileTerms)}`, {cache: "no-store"})).json(); localStorage.setItem("betterStartReaderDay", today); setJoyHistory(recentHistory("betterStartReaderJoyHistory")); setData(previous => prepareEdition(next, previous, preserve && !hardRefresh)); setEditionNote(`${preserve && !hardRefresh ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})} edition`); lastLoad = Date.now(); } catch {}
+      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`, mediaHistory = recentHistory("betterStartReaderMediaHistory"), avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(","), avoidStories = recentStoryAvoidance(), places = savedPlaces(), profileTerms = activeProfile ? [...(activeProfile.broadInterests || []), ...(activeProfile.specificInterests || []), ...(activeProfile.details || []), ...(activeProfile.granularInterests || []), ...(activeProfile.anythingElse || [])].slice(0, 72).join("|") : "";
+      try {
+        const today = localDayKey(new Date()), priorDay = localStorage.getItem("betterStartReaderDay"), hardRefresh = priorDay !== today;
+        // First paint waits for one balanced edition only. The background
+        // queue then grows invisibly to 100, without blocking the front door.
+        const editions = [await requestFeed({visit,avoid,avoidStories,places,interests:profileTerms,editionName:activeProfile?.title || ""})];
+        localStorage.setItem("betterStartReaderDay", today); setJoyHistory(recentHistory("betterStartReaderJoyHistory"));
+        if (preserve) setData(previous => {
+          const prepared = prepareEdition(editions[0], previous, !hardRefresh);
+          try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
+          return prepared;
+        });
+        else {
+          const clean = editions.map(filterEditionGlobally), primary = clean[0];
+          const reserved = [...(primary?.tickerStories || []), primary?.goodNews, ...(primary?.favorites || [])].filter(Boolean);
+          const gallery = claimSessionUnique(clean.flatMap(edition => edition?.gallery || []), reserved).slice(0, 140);
+          const prepared = {...primary, gallery:stampNew(gallery)};
+          try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
+          setData(prepared);
+        }
+        setEditionNote(`${preserve && !hardRefresh ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})} edition`); lastLoad = Date.now();
+      } catch {}
     };
     loadEdition(false);
     const clock = setInterval(() => setNow(new Date()), 60000), editionTimer = setInterval(() => loadEdition(true), EDITION_MS);
@@ -249,58 +558,137 @@ export default function Home() {
     return () => { clearInterval(clock); clearInterval(editionTimer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
-  const daypart = now.getHours() < 10 ? "sunrise" : now.getHours() < 12 ? "lateMorning" : now.getHours() < 17 ? "afternoon" : "evening";
-  const helloThought = daypart === "sunrise" ? "Fresh coffee. Open curtains. The world still contains wonders." : daypart === "lateMorning" ? "A bright little detour before the day gets away." : daypart === "afternoon" ? "A second wind, made of curiosity instead of caffeine." : "A softer landing for the end of the day.";
+  const daypart = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
+  const daypartMessages = DAYPART_MESSAGES[daypart], helloThought = daypartMessages[Math.abs(Math.floor(now.getTime() / EDITION_MS)) % daypartMessages.length];
   const date = now.toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
-  const dailyFact = QUESTIONS[Math.floor(now.getTime() / 86400000) % QUESTIONS.length];
-  const uniqueFavorites = useMemo(() => { const seen = new Set(); (data?.tickerStories || [data?.ribbonFavorite]).filter(Boolean).forEach(item => identityKeys(item).forEach(key => seen.add(key))); return claimUnique(data?.favorites || [], seen); }, [data]);
-  const wall = useMemo(() => { const pageSeen = new Set(); [...(data?.tickerStories || [data?.ribbonFavorite]), data?.goodNews, ...(data?.favorites || []), ...(data?.important || [])].filter(Boolean).forEach(item => identityKeys(item).forEach(key => pageSeen.add(key))); const stories = claimUnique(data?.gallery || [], pageSeen), media = claimUnique(data?.media || [], pageSeen), mixed = []; while (stories.length || media.length) { mixed.push(...stories.splice(0, 2)); if (media.length) mixed.push(media.shift()); } const result = [], pool = [...mixed], lastSeen = new Map(); while (pool.length) { const recent = result.slice(-20).map(item => item.source); let index = pool.findIndex(item => !recent.includes(item.source)); if (index < 0) { let oldest = Infinity; pool.forEach((item, candidate) => { const seen = lastSeen.get(item.source) ?? -Infinity; if (seen < oldest) { oldest = seen; index = candidate; } }); } const item = pool.splice(Math.max(0, index), 1)[0]; lastSeen.set(item.source, result.length); result.push(item); } const balanced = rebalanceVisualBlocks(result), edition = data?.edition || 0, joyful = [], reserved = [...joyHistory]; for (let start = 0, bench = 0; start < balanced.length; start += 24, bench++) { const group = balanced.slice(start, start + 24), position = Math.min(group.length, 6 + bench % 5), joyType = JOY_TYPES[(edition + bench) % JOY_TYPES.length], choice = chooseJoy(joyType, edition, bench, reserved); reserved.push({signature: choice.signature, ts: Date.now()}); group.splice(position, 0, {format: "joy", joyType, variant: choice.variant, signature: choice.signature, edition, title: "A small Meanwhile joy break", source: "Meanwhile Joy Bench", section: "JOY", canonicalUrl: `joy-${edition}-${bench}-${choice.signature}`, url: `#joy-${edition}-${bench}`}); joyful.push(...group); } return joyful; }, [data, joyHistory]);
-  const uniqueSerendipity = useMemo(() => { const pageSeen = new Set(); [...(data?.tickerStories || [data?.ribbonFavorite]), data?.goodNews, ...(data?.favorites || []), ...(data?.important || []), ...wall].filter(item => item && item.format !== "joy").forEach(item => identityKeys(item).forEach(key => pageSeen.add(key))); return claimUnique(data?.serendipity || [], pageSeen); }, [data, wall]);
-  const visibleBatches = useMemo(() => Array.from({length: batches}, (_, index) => wall.slice(index * BATCH_SIZE, (index + 1) * BATCH_SIZE)).filter(batch => batch.length), [wall, batches]);
-  useEffect(() => { if (!wall.length) return; const visible = [...(data?.tickerStories || []), data?.goodNews, ...(data?.favorites || []), ...(data?.important || []), ...wall.slice(0, batches * BATCH_SIZE), ...uniqueSerendipity.slice(0, serendipityCount)].filter(Boolean), nowSeen = Date.now(), stories = storyHistory(), storyKeys = new Set(stories.flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean)); visible.filter(item => item.format !== "joy").forEach(item => { const keys = identityKeys(item), id = itemKey(item); if (!id || keys.some(key => storyKeys.has(key)) || storyKeys.has(id)) return; stories.push({id,keys,ts:nowSeen}); storyKeys.add(id); keys.forEach(key => storyKeys.add(key)); }); localStorage.setItem(STORY_HISTORY_KEY, JSON.stringify(stories.slice(-STORY_HISTORY_LIMIT))); const media = recentHistory("betterStartReaderMediaHistory"), mediaIds = new Set(media.map(entry => entry.id)); visible.filter(item => item.videoId && !mediaIds.has(item.videoId)).forEach(item => media.push({id: item.videoId, ts: nowSeen})); localStorage.setItem("betterStartReaderMediaHistory", JSON.stringify(media.slice(-300))); const joy = recentHistory("betterStartReaderJoyHistory"), joyIds = new Set(joy.map(entry => entry.signature)); visible.filter(item => item.signature && !joyIds.has(item.signature)).forEach(item => joy.push({signature: item.signature, ts:nowSeen})); localStorage.setItem("betterStartReaderJoyHistory", JSON.stringify(joy.slice(-300))); }, [data, wall, batches, uniqueSerendipity, serendipityCount]);
-  const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartReaderFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartReaderFeedback", JSON.stringify(ratings.slice(-250))); };
-  const toggleSave = item => setSaved(current => { const exists = current.some(savedItem => itemKey(savedItem) === itemKey(item)), next = exists ? current.filter(savedItem => itemKey(savedItem) !== itemKey(item)) : [{...item, savedAt: Date.now()}, ...current]; localStorage.setItem("betterStartReaderSaved", JSON.stringify(next.slice(0, 200))); return next.slice(0, 200); });
+  const smallDelight = SMALL_DELIGHTS[Math.abs(data?.edition || Math.floor(Date.now() / EDITION_MS)) % SMALL_DELIGHTS.length];
+  const uniqueFavorites = useMemo(() => { const seen = new Set(); (data?.tickerStories || [data?.ribbonFavorite]).filter(Boolean).forEach(item => identityKeys(item).forEach(key => seen.add(key))); return spreadAdjacentSources(claimUnique(data?.favorites || [], seen)); }, [data]);
+  const hasDisplayedDog = uniqueFavorites.some(item => item.source === "WeRateDogs" || /\b(dog|dogs|doggie|doggies|puppy|puppies|canine|greyhound|labrador|retriever|terrier|beagle|collie|shepherd|schnauzer|spaniel|corgi|dachshund)\b/i.test(`${item.title || ""} ${item.summary || ""} ${item.section || ""}`));
+  // The API has already composed gallery in balanced 20-story windows. Keep
+  // that canonical order: merging the auxiliary shelves here used to destroy
+  // the topic quotas and was the source of sports-heavy and repeated pages.
+  const wall = useMemo(() => claimSessionUnique(data?.gallery || [], [...(data?.tickerStories || [data?.ribbonFavorite]), data?.goodNews, ...uniqueFavorites]), [data, uniqueFavorites]);
+  const visibleBatches = useMemo(() => {
+    const visibleWall = spreadAdjacentSources(wall.slice(0, batches * BATCH_SIZE));
+    return Array.from({length: Math.ceil(visibleWall.length / BATCH_SIZE)}, (_, index) => visibleWall.slice(index * BATCH_SIZE, (index + 1) * BATCH_SIZE)).filter(batch => batch.length);
+  }, [wall, batches]);
+  useEffect(() => { if (!wall.length) return; const visible = [...(data?.tickerStories || []), data?.goodNews, ...(data?.favorites || []), ...wall.slice(0, batches * BATCH_SIZE)].filter(Boolean), nowSeen = Date.now(), stories = storyHistory(), storyKeys = new Set(stories.flatMap(entry => [entry.id, ...(entry.keys || [])]).filter(Boolean)), seenLedger = permanentSeenHashes(), newHistory = []; visible.filter(item => item.format !== "joy").forEach(item => { const keys = identityKeys(item), id = itemKey(item); if (!id) return; identityHashes(item).forEach(hash => seenLedger.add(hash)); if (keys.some(key => storyKeys.has(key)) || storyKeys.has(id)) return; stories.push({id,keys,ts:nowSeen}); newHistory.push({user_id:user?.id, story_key:id, identity_keys:keys, story:item, last_seen_at:new Date(nowSeen).toISOString()}); storyKeys.add(id); keys.forEach(key => storyKeys.add(key)); }); writeSeenLedger(seenLedger); try { localStorage.setItem(STORY_HISTORY_KEY, JSON.stringify(stories.slice(-STORY_HISTORY_LIMIT))); } catch {} if (supabase && user && newHistory.length) supabase.from("story_history").upsert(newHistory, {onConflict:"user_id,story_key"}); const media = recentHistory("betterStartReaderMediaHistory"), mediaIds = new Set(media.map(entry => entry.id)); visible.filter(item => item.videoId && !mediaIds.has(item.videoId)).forEach(item => media.push({id: item.videoId, ts: nowSeen})); localStorage.setItem("betterStartReaderMediaHistory", JSON.stringify(media.slice(-300))); const joy = recentHistory("betterStartReaderJoyHistory"), joyIds = new Set(joy.map(entry => entry.signature)); visible.filter(item => item.signature && !joyIds.has(item.signature)).forEach(item => joy.push({signature: item.signature, ts:nowSeen})); localStorage.setItem("betterStartReaderJoyHistory", JSON.stringify(joy.slice(-300))); }, [data, wall, batches, user]);
+  const rate = (item, action) => { const ratings = JSON.parse(localStorage.getItem("betterStartReaderFeedback") || "[]"); ratings.push({url: item.url, title: item.title, source: item.source, action, ts: Date.now()}); localStorage.setItem("betterStartReaderFeedback", JSON.stringify(ratings.slice(-250))); if (supabase && user) supabase.from("story_feedback").insert({user_id:user.id, story_key:itemKey(item), action, story:item}); };
+  const toggleSave = item => setSaved(current => { const exists = current.some(savedItem => itemKey(savedItem) === itemKey(item)), next = exists ? current.filter(savedItem => itemKey(savedItem) !== itemKey(item)) : [{...item, savedAt: Date.now()}, ...current]; localStorage.setItem("betterStartReaderSaved", JSON.stringify(next.slice(0, 200))); if (supabase && user) { if (exists) supabase.from("saved_stories").delete().eq("user_id", user.id).eq("story_key", itemKey(item)); else supabase.from("saved_stories").upsert({user_id:user.id, story_key:itemKey(item), story:item}); } return next.slice(0, 200); });
+  const sendSignInLink = async event => { event.preventDefault(); if (!supabase) { setAccountStatus("Supabase is not connected to this deployment yet."); return; } setAccountStatus("Sending your secure link…"); const {error} = await supabase.auth.signInWithOtp({email:accountEmail, options:{emailRedirectTo:location.origin}}); setAccountStatus(error ? error.message : "Check your email. Your sign-in link is on the way."); };
+  const signOut = async () => { if (supabase) await supabase.auth.signOut(); setUser(null); setAccountStatus("Signed out on this device."); };
   const share = async item => { const text = `I found this on Meanwhile — rage-free news, information and good times.\n\n${item.title}`, params = new URLSearchParams({u: item.url, t: item.title, s: item.source || "", c: item.section || ""}); if (item.image) params.set("i", item.image); const shareUrl = `${location.origin}/share?${params}`; try { if (navigator.share) await navigator.share({title: `${item.title} — Meanwhile`, text, url: shareUrl}); else { await navigator.clipboard.writeText(`${text}\n${shareUrl}`); setEditionNote("Branded share link copied"); } } catch {} };
-  const loadMoreSerendipity = async () => {
-    if (serendipityLoading) return;
-    if (serendipityCount < uniqueSerendipity.length) { setSerendipityCount(count => count + SERENDIPITY_BATCH_SIZE); return; }
-    setSerendipityLoading(true); setEditionNote("Finding another worthwhile detour");
+  const prefetchMoreGoodThings = async () => {
+    if (queueRequestRef.current) return;
+    queueRequestRef.current = true; setQueueLoading(true);
     try {
-      const mediaHistory = recentHistory("betterStartReaderMediaHistory"), priorStories = storyHistory();
-      const currentItems = [...(data?.tickerStories || []), data?.goodNews, ...(data?.favorites || []), ...(data?.important || []), ...(data?.gallery || []), ...(data?.media || []), ...(data?.serendipity || [])].filter(Boolean);
+      const mediaHistory = recentHistory("betterStartReaderMediaHistory");
+      const current = dataRef.current;
+      // Only displayed/reserved stories count as consumed. Hidden auxiliary
+      // shelves are valid inventory for the next 25, not phantom duplicates.
+      const currentItems = [...(current?.tickerStories || []), current?.goodNews, ...(current?.favorites || []), ...(current?.gallery || [])].filter(Boolean);
       const avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(",");
       const currentStoryKeys = currentItems.flatMap(item => [itemKey(item), ...identityKeys(item)]);
-      const avoidStories = [...new Set([...priorStories.flatMap(entry => [entry.id, ...(entry.keys || [])]), ...currentStoryKeys].map(stableHash))].slice(-900).join(",");
-      const places = savedPlaces(), profileTerms = profile ? [...(profile.broadInterests || []), ...(profile.specificInterests || []), ...(profile.details || []), ...(profile.anythingElse || [])].slice(0, 48).join("|") : "";
-      const visit = `surprise-${Date.now()}-${Math.random()}`;
-      const next = await (await fetch(`/api/feed?visit=${encodeURIComponent(visit)}&avoid=${encodeURIComponent(avoid)}&avoidStories=${encodeURIComponent(avoidStories)}&places=${encodeURIComponent(places)}&interests=${encodeURIComponent(profileTerms)}`, {cache:"no-store"})).json();
-      const fresh = filterEditionGlobally(next);
-      const arrivals = fresh?.serendipity?.length ? fresh.serendipity : (fresh?.gallery || []).slice(0, 60);
-      setData(previous => ({...previous, serendipity:stampNew([...(previous?.serendipity || []), ...arrivals])}));
-      setSerendipityCount(count => count + SERENDIPITY_BATCH_SIZE); setEditionNote("A fresh detour arrived");
-    } catch { setEditionNote("Couldn’t fetch another detour just yet"); }
-    finally { setSerendipityLoading(false); }
+      // Infinite scroll has a session contract: exclude everything already in
+      // this edition, but do not send years of history and accidentally drain
+      // the candidate pool. Cross-visit freshness still applies on first load.
+      const avoidStories = [...new Set(currentStoryKeys.map(stableHash))].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
+      const places = savedPlaces(), profileTerms = profile ? [...(profile.broadInterests || []), ...(profile.specificInterests || []), ...(profile.details || []), ...(profile.granularInterests || []), ...(profile.anythingElse || [])].slice(0, 72).join("|") : "";
+      const visit = `more-good-${Date.now()}-${Math.random()}`;
+      const next = await requestFeed({visit,avoid,avoidStories,places,interests:profileTerms,editionName:profile?.title || ""});
+      // The request already excludes the current wall. Apply the live session
+      // registry below, rather than the permanent-history gate used at entry.
+      const fresh = next;
+      const existing = dataRef.current?.gallery || [];
+      const additions = claimSessionUnique([
+        ...(fresh?.gallery || []),
+        ...(fresh?.serendipity || []),
+        ...(fresh?.important || []),
+        ...(fresh?.media || [])
+      ], currentItems);
+      if (additions.length) {
+        setData(previous => ({...previous, gallery:stampNew([...(previous?.gallery || []), ...additions])})); setQueueExhausted(false);
+        if (revealWhenReadyRef.current) { revealWhenReadyRef.current = false; setBatches(count => count + 1); }
+      }
+      else {
+        setQueueExhausted(true);
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => setQueueExhausted(false), 10000);
+      }
+    } catch {
+      setQueueExhausted(true);
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => setQueueExhausted(false), 10000);
+    }
+    finally { queueRequestRef.current = false; setQueueLoading(false); }
   };
+  useEffect(() => {
+    const queued = wall.length - batches * BATCH_SIZE;
+    if (data && queued < 100 && !queueLoading && !queueExhausted) prefetchMoreGoodThings();
+  }, [data, wall.length, batches, queueLoading, queueExhausted]);
+  useEffect(() => () => clearTimeout(retryTimerRef.current), []);
+  const revealMoreGoodThings = () => {
+    const visibleCount = batches * BATCH_SIZE;
+    if (visibleCount < wall.length) {
+      setBatches(count => Math.min(count + 1, Math.ceil(wall.length / BATCH_SIZE)));
+      return;
+    }
+    // The primary response also carries a reserve shelf. Promote it instantly
+    // before waiting on the network, so clicking the button always has a
+    // synchronous path whenever the server already prepared more stories.
+    const current = dataRef.current;
+    const displayed = [...(current?.tickerStories || []), current?.goodNews, ...(current?.favorites || []), ...(current?.gallery || [])].filter(Boolean);
+    const localAdditions = claimSessionUnique([
+      ...(current?.serendipity || []),
+      ...(current?.important || []),
+      ...(current?.media || [])
+    ], displayed).slice(0, BATCH_SIZE);
+    if (localAdditions.length) {
+      setData(previous => ({...previous, gallery:stampNew([...(previous?.gallery || []), ...localAdditions])}));
+      setBatches(count => count + 1);
+      return;
+    }
+    revealWhenReadyRef.current = true; setQueueExhausted(false); prefetchMoreGoodThings();
+  };
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => {
+      // Always register the reader's intent. If replenishment is already in
+      // flight, revealMoreGoodThings leaves a pending flag that the request
+      // fulfills on arrival instead of losing this intersection event.
+      if (entries[0]?.isIntersecting) revealMoreGoodThings();
+    }, {rootMargin:"1200px 0px"});
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [batches, wall.length, data, queueLoading, queueExhausted]);
   const savedKeys = useMemo(() => new Set(saved.map(itemKey)), [saved]);
+  const clearProfile = () => { localStorage.removeItem(PROFILE_KEY); location.href = "/"; };
+  const closeWelcome = () => { localStorage.setItem("meanwhileWelcomeSeenV1", "yes"); setShowWelcome(false); };
+  const closeSaveNudge = () => { sessionStorage.setItem("meanwhileSaveNudgeSeen", "yes"); setShowSaveNudge(false); };
+  const closeGenericNudge = () => { sessionStorage.setItem("meanwhileGenericNudgeSeen", "yes"); setShowGenericNudge(false); };
+  const openSaveAccount = () => { closeSaveNudge(); setAccountStatus(""); setAccountOpen(true); };
   const identityClass = `identity-${data?.editorialIdentity?.id || "general"}`;
-  const palette = EDITION_PALETTES[paletteIndex], masthead = mastheadPalette(palette), paletteStyle = {"--palette-1":palette[0],"--palette-2":palette[1],"--palette-3":palette[2],"--palette-4":palette[3]};
-  const editionTitle = "Andrew’s Edition";
+  const palette = EDITION_PALETTES[paletteIndex], masthead = mastheadPalette(palette, theme === "dark" ? "#151714" : "#F3EFE5"), paletteStyle = {"--palette-1":palette[0],"--palette-2":palette[1],"--palette-3":palette[2],"--palette-4":palette[3]};
+  const editionTitle = profile?.title?.replace(/^Meanwhile\s*[—-]\s*/i, "") || "";
   return <main style={paletteStyle} className={`shell daypart-${daypart} ${identityClass}`} data-editorial-identity={data?.editorialIdentity?.label || "Meanwhile"}>
-    <header className="mast"><div className="mastIdentity"><div className="brand brandVignelli" aria-label="Meanwhile">{"Meanwhile".split("").map((letter,index) => <span aria-hidden="true" style={{color:masthead[index]}} key={`${letter}-${index}`}>{letter}</span>)}</div><div className="editionName">{editionTitle}</div><div className="edition">Rage-free news, discovery & good times</div></div><div className="mastTools"><a className="personalizeButton" href="/make-it-yours">Tune my edition</a><button className="savedButton" onClick={() => setShowSaved(value => !value)}>Saved <b>{saved.length}</b></button><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Meanwhile Radio ${radio ? "on" : "off"}`} title="Meanwhile Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button></div></header>
+    {showWelcome && <div className="welcomeVeil" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeWelcome(); }}><section className="welcomeNote" role="dialog" aria-modal="true" aria-labelledby="welcome-title"><button className="welcomeClose" onClick={closeWelcome} aria-label="Close welcome message">×</button><span className="welcomeEyebrow">A small note before you begin</span><h2 id="welcome-title">Welcome to Meanwhile</h2><p className="welcomeSubline">A celebration of everything going on in the world besides the news.</p><ol><li>Explore a mix of science, food, travel, fashion, animals, ingenuity, kindness, culture and other good times.</li><li>Make your own personal edition of your favorite things.</li><li>Come back all the time. Everything is constantly refreshed.</li></ol><div className="welcomeActions"><button onClick={closeWelcome}>Start reading <span>→</span></button><a href="/make-it-yours" onClick={closeWelcome}>Make it mine</a></div></section></div>}
+    {showSaveNudge && <div className="saveNudge" role="dialog" aria-labelledby="save-nudge-title"><button className="saveNudgeClose" onClick={closeSaveNudge} aria-label="Dismiss save edition message">×</button><span>Your edition is looking good</span><h2 id="save-nudge-title">Want to keep it?</h2><p>Sign up with your email and we’ll save your personalized Meanwhile.</p><small>We won’t spam you or sell your information. Promise. We just want to help you keep your edition.</small><div><button onClick={openSaveAccount}>Save my edition</button><button onClick={closeSaveNudge}>Maybe later</button></div></div>}
+    {showGenericNudge && <div className="saveNudge genericNudge" role="dialog" aria-labelledby="generic-nudge-title"><button className="saveNudgeClose" onClick={closeGenericNudge} aria-label="Dismiss personalized edition invitation">×</button><span>Meanwhile, but more you</span><h2 id="generic-nudge-title">Want your own edition?</h2><p>Tell us a little about what you love and we’ll weave more of it into your feed.</p><small>It never becomes a filter bubble. At least half of every edition stays broad, surprising and edited by Meanwhile.</small><div><a href="/make-it-yours" onClick={closeGenericNudge}>Make it mine</a><button onClick={closeGenericNudge}>Keep reading</button></div></div>}
+    {accountOpen && <AccountPanel user={user} email={accountEmail} setEmail={setAccountEmail} status={accountStatus} onSendLink={sendSignInLink} onSignOut={signOut} onClose={() => setAccountOpen(false)} />}
+    <header className="mast"><div className="mastIdentity"><div className="brand brandVignelli" aria-label="Meanwhile">{"Meanwhile".split("").map((letter,index) => <span aria-hidden="true" style={{color:masthead[index]}} key={`${letter}-${index}`}>{letter}</span>)}</div>{editionTitle && <div className="editionName">{editionTitle}</div>}<div className="edition">Rage-free news, discovery & good times</div></div><div className="mastTools"><a className="personalizeButton" href="/make-it-yours">{profile ? "Tune my edition" : "Make it yours"}</a>{profile && <button className="genericButton" onClick={clearProfile}>Generic Edition</button>}<button className="accountButton" onClick={() => { setAccountStatus(user ? "Your Meanwhile is synced." : ""); setAccountOpen(true); }}>{user ? "My account" : "Sign in"}</button><button className="savedButton" onClick={() => setShowSaved(value => !value)}>Saved <b>{saved.length}</b></button><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Meanwhile Radio ${radio ? "on" : "off"}`} title="Meanwhile Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button><button className="themeToggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}><span>{theme === "dark" ? "☀" : "☾"}</span><small>{theme === "dark" ? "LIGHT" : "DARK"}</small></button></div></header>
     <div className="hello"><h1>{greeting}.</h1><div className="helloAside"><p>{date}</p><span>{helloThought}</span></div></div>
 
-    <section className="ribbon" aria-label="Useful information"><div className="weatherFact"><b>New Canaan weather</b><span>{weather ? `${weather.current}° now · High ${weather.high}° · Low ${weather.low}° · ${weather.precip}% rain` : "Checking current conditions…"}</span></div><GoodNewsWire items={data?.tickerStories || (data?.ribbonFavorite ? [data.ribbonFavorite] : [])}/><RollingFact label="Quick fact">{dailyFact.answer}</RollingFact></section>
+    <section className="ribbon" aria-label="Quick facts"><div className="weatherFact"><b>{greeting}</b><span>{date}</span></div><GoodNewsWire items={spreadAdjacentSources(data?.tickerStories || (data?.ribbonFavorite ? [data.ribbonFavorite] : []))}/><RollingFact label={editionNote}>{smallDelight}</RollingFact></section>
 
     {showSaved && <section className="savedShelf"><div className="sectionHead"><div><span>Your keepers</span><h2>Saved Good Stuff</h2></div><button onClick={() => setShowSaved(false)}>Close</button></div>{saved.length ? <div className="savedGrid">{saved.map(item => <article key={itemKey(item)}><span>{item.section}</span><h3><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></h3><div><button onClick={() => share(item)}>Share</button><button onClick={() => toggleSave(item)}>Remove</button></div></article>)}</div> : <p className="emptySaved">Things you save will wait here—even when the wall refreshes.</p>}</section>}
 
-    <section className="favoritesSection"><div className="sectionHead"><div><span>A few especially nice things</span><h2>Bright Spots</h2></div><p>Kindness, ingenuity & excellent dogs</p></div><div className="favorites">{uniqueFavorites.map(item => <a className="favorite" href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl}><span>{age(item.date)}</span><h3>{item.title}</h3><b>{item.source}</b></a>)}</div></section>
+    <section className="favoritesSection"><div className="sectionHead"><div><span>A few especially nice things</span><h2>Bright Spots</h2></div><p>{hasDisplayedDog ? "Kindness, ingenuity & excellent dogs" : "Kindness, ingenuity & excellent animals"}</p></div><div className="favorites">{uniqueFavorites.map(item => <a className="favorite" href={item.url} target="_blank" rel="noreferrer" key={item.canonicalUrl}><span>{age(item.date)}</span><h3>{item.title}</h3><b>{item.source}</b></a>)}</div></section>
 
-    <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Every good magazine on the table</span><h2>Good Stuff</h2></div><p>Chosen for joy, curiosity & variety</p></div>{visibleBatches.length ? visibleBatches.map((batch, batchIndex) => <div className="galleryBatch" key={batchIndex}>{Array.from({length: Math.ceil(batch.length / 10)}, (_, clusterIndex) => { const cluster = arrangeForFrames(batch.slice(clusterIndex * 10, (clusterIndex + 1) * 10)), variant = (batchIndex * 3 + clusterIndex) % 3; return <div className={`tetrisCluster clusterVariant-${variant} clusterCount-${cluster.length} ${cluster.length <= 5 ? "partialCluster" : ""}`} key={clusterIndex}>{cluster.map((item, index) => { const absoluteIndex = batchIndex * BATCH_SIZE + clusterIndex * 10 + index; return item.format === "joy" ? <JoyTile item={item} index={absoluteIndex} key={item.canonicalUrl} /> : <Story item={item} fallbackItem={data?.visualReserve?.[absoluteIndex]} index={absoluteIndex} paletteIndex={absoluteIndex} palette={palette} onRate={rate} onSave={toggleSave} onShare={share} saved={savedKeys.has(itemKey(item))} key={item.canonicalUrl} />; })}</div>; })}</div>) : <div className="loading"><span>Composing today&apos;s wall</span><i /><i /><i /></div>}
-      {batches * BATCH_SIZE < wall.length && <div className="loadWrap"><button className="loadBtn" onClick={() => setBatches(count => count + 1)}>Load 25 More Good Things<span>↓</span></button></div>}
+    <section className="gallerySection"><div className="sectionHead wallHead"><div><span>Every good magazine on the table</span><h2>Good Stuff</h2></div><p>{profile ? "Your interests, with the wider world left in" : "A deliberately broad, lively mix"}</p></div>{visibleBatches.length ? <div className="galleryWall">{visibleBatches.map((batch, batchIndex) => <div className="galleryBatch" key={batchIndex}>{arrangeFrameClusters(batch).map((cluster, clusterIndex) => { const variant = (batchIndex * 3 + clusterIndex) % 3; return <div className={`tetrisCluster clusterVariant-${variant} clusterCount-${cluster.length} ${cluster.length <= 5 ? "partialCluster" : ""}`} key={clusterIndex}>{cluster.map((item, index) => { const absoluteIndex = batchIndex * BATCH_SIZE + clusterIndex * 10 + index; return item.format === "joy" ? <JoyTile item={item} index={absoluteIndex} key={item.canonicalUrl} /> : <Story item={item} index={absoluteIndex} paletteIndex={absoluteIndex} palette={palette} onRate={rate} onSave={toggleSave} onShare={share} saved={savedKeys.has(itemKey(item))} key={item.canonicalUrl} />; })}</div>; })}</div>)}</div> : <div className="loading" role="status" aria-live="polite"><span>Getting everything ready…</span><div className="loadingTrack" aria-hidden="true"><i /></div><small>Finding good things from around the world</small></div>}
+      {data && <div className="infiniteSentinel" ref={loadMoreRef} aria-hidden="true" />}
     </section>
 
-    <section className="important"><div className="importantIntro"><span>Worth knowing</span><h2>Good News With Consequence</h2><p>A small, calm briefing about discoveries, progress and people making things better.</p></div><div className="importantGrid">{(data?.important || []).map((item, index) => <Story item={item} index={index} paletteIndex={1000 + index} palette={palette} onRate={rate} onSave={toggleSave} onShare={share} saved={savedKeys.has(itemKey(item))} key={item.canonicalUrl} />)}</div></section>
-    <section className="serendipity"><div className="sectionHead"><div><span>One more magazine underneath</span><h2>You Didn&apos;t Ask For This…</h2></div><p>Worth the detour</p></div><div className="serendipityWall">{Array.from({length: Math.ceil(Math.min(serendipityCount, uniqueSerendipity.length) / 10)}, (_, clusterIndex) => { const cluster = arrangeForFrames(uniqueSerendipity.slice(clusterIndex * 10, Math.min(serendipityCount, (clusterIndex + 1) * 10))), variant = (clusterIndex + 1) % 3; return <div className={`tetrisCluster clusterVariant-${variant} clusterCount-${cluster.length} ${cluster.length <= 5 ? "partialCluster" : ""}`} key={clusterIndex}>{cluster.map((item, index) => { const absoluteIndex = clusterIndex * 10 + index; return <Story item={item} index={absoluteIndex} paletteIndex={2000 + absoluteIndex} palette={palette} onRate={rate} onSave={toggleSave} onShare={share} saved={savedKeys.has(itemKey(item))} key={item.canonicalUrl} />; })}</div>; })}</div><div className="loadWrap"><button className="loadBtn surpriseBtn" onClick={loadMoreSerendipity} disabled={serendipityLoading}>{serendipityLoading ? "Finding More Good Stuff…" : "Add More Stuff I Didn’t Ask For"}<span>↓</span></button></div></section>
     <footer><b>MEANWHILE</b><span>Good things worth knowing · No outrage required</span></footer>
   </main>;
 }

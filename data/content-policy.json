@@ -3,7 +3,11 @@
     "donald trump", "trump", "barack obama", "joe biden", "maga", "maha", "mar a lago", "white house",
     "republican", "republicans", "democrat", "democrats", "gop", "congress", "senate", "house speaker",
     "presidential election", "election", "elections", "election campaign", "campaign", "campaigns", "midterm election", "politics", "says mp",
-    "political", "supreme court", "department of justice", "doj", "fbi",
+    "political", "politician", "supreme court", "department of justice", "doj", "fbi",
+    "president", "vice president", "first lady", "oval office", "administration", "cabinet",
+    "secretary of state", "secretary of defense", "transportation secretary", "sean duffy",
+    "state department", "department of transportation", "governor", "lieutenant governor", "mayor",
+    "prime minister", "parliament", "member of parliament", "congressman", "congresswoman", "executive order",
     "ice agents", "pentagon", "nazi", "nazis", "neo nazi", "neo nazis", "fascist", "fascists", "fascism",
     "white supremacist", "white supremacy", "ku klux klan", "kkk",
     "antisemitic", "antisemitism", "hate group", "culture war"
@@ -38,8 +42,8 @@
     "ufc", "mma", "sports betting", "online betting", "gambling", "sportsbook"
   ],
   "public_space_safety": [
-    "porn", "pornography", "pornographic", "nsfw", "nudity", "nude", "naked", "topless", "full frontal",
-    "genitals", "genital", "penis", "vulva", "vagina", "erotic", "erotica", "sexually explicit", "adult content",
-    "figure study", "boudoir"
+    "porn", "pornography", "pornographic", "nsfw", "nudity", "nude", "naked", "topless",
+    "full frontal", "genitals", "genital", "penis", "vulva", "vagina", "erotic", "erotica",
+    "sexually explicit", "adult content", "figure study", "boudoir"
   ]
 }
