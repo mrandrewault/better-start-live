@@ -13,7 +13,7 @@ const STORY_HISTORY_KEY = "betterStartReaderStoryHistoryV3";
 const SEEN_STORY_LEDGER_KEY = "meanwhileSeenStoryHashesV3";
 // V2 discards the NASA-heavy snapshot produced before mixed-content image
 // URLs were upgraded and visual diversity was enforced.
-const FEED_SNAPSHOT_KEY = "meanwhileFeedSnapshotV3";
+const FEED_SNAPSHOT_KEY = "meanwhileFeedSnapshotV4";
 const STORY_HISTORY_LIMIT = 1500;
 const SEEN_STORY_LEDGER_LIMIT = 50000;
 const DAYPART_MESSAGES = {
@@ -404,7 +404,7 @@ function Story({item, index, paletteIndex = index, palette, onRate, onSave, onSh
   const playerUrl = type === "video" ? `https://www.youtube-nocookie.com/embed/${replacement.videoId}?autoplay=1&rel=0` : replacement.embedUrl;
   const inspectImage = event => {
     const image = event.currentTarget, longEdge = Math.max(image.naturalWidth, image.naturalHeight), shortEdge = Math.min(image.naturalWidth, image.naturalHeight);
-    if (longEdge < 900 || shortEdge < 500 || image.naturalWidth * image.naturalHeight < 700000) setImageRejected(true);
+    if (longEdge < 1200 || shortEdge < 700 || image.naturalWidth * image.naturalHeight < 1200000) setImageRejected(true);
   };
   useLayoutEffect(() => {
     const tile = tileRef.current;
@@ -448,7 +448,7 @@ function Story({item, index, paletteIndex = index, palette, onRate, onSave, onSh
 
 export default function Home() {
   const [data, setData] = useState(null), [batches, setBatches] = useState(1), [queueLoading, setQueueLoading] = useState(false), [queueExhausted, setQueueExhausted] = useState(false), [radio, setRadio] = useState(false), [now, setNow] = useState(new Date()), [saved, setSaved] = useState([]), [showSaved, setShowSaved] = useState(false), [showWelcome, setShowWelcome] = useState(false), [showSaveNudge, setShowSaveNudge] = useState(false), [showGenericNudge, setShowGenericNudge] = useState(false), [theme, setTheme] = useState("light"), [editionNote, setEditionNote] = useState("Composing edition"), [joyHistory, setJoyHistory] = useState([]), [profile, setProfile] = useState(null), [paletteIndex, setPaletteIndex] = useState(0), [user, setUser] = useState(null), [accountOpen, setAccountOpen] = useState(false), [accountEmail, setAccountEmail] = useState(""), [accountStatus, setAccountStatus] = useState("");
-  const dataRef = useRef(null), queueRequestRef = useRef(false), loadMoreRef = useRef(null), revealWhenReadyRef = useRef(false), retryTimerRef = useRef(null);
+  const dataRef = useRef(null), queueRequestRef = useRef(false), loadMoreRef = useRef(null), revealWhenReadyRef = useRef(false), retryTimerRef = useRef(null), refreshEditionRef = useRef(null);
   useEffect(() => { dataRef.current = data; }, [data]);
   useEffect(() => {
     if (!supabase) return;
@@ -516,9 +516,10 @@ export default function Home() {
   }, [user]);
   useEffect(() => {
     setSaved(JSON.parse(localStorage.getItem("betterStartReaderSaved") || "[]")); setJoyHistory(recentHistory("betterStartReaderJoyHistory"));
+    let cachedSnapshot = null;
     try {
-      const snapshot = JSON.parse(localStorage.getItem(FEED_SNAPSHOT_KEY) || "null");
-      if (snapshot?.gallery?.length >= BATCH_SIZE) { setData(snapshot); setEditionNote("Refreshing quietly"); }
+      cachedSnapshot = JSON.parse(localStorage.getItem(FEED_SNAPSHOT_KEY) || "null");
+      if (cachedSnapshot?._dayKey === localDayKey(new Date()) && cachedSnapshot?.gallery?.length >= BATCH_SIZE) { setData(cachedSnapshot); setEditionNote("Refreshing quietly"); }
     } catch {}
     setShowWelcome(localStorage.getItem("meanwhileWelcomeSeenV1") !== "yes");
     const priorPalette = Number(localStorage.getItem("betterStartPaletteIndex") || "-1"), nextPalette = (priorPalette + 1) % EDITION_PALETTES.length;
@@ -527,16 +528,20 @@ export default function Home() {
     try { activeProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch {}
     setProfile(activeProfile);
     let lastLoad = Date.now();
-    const loadEdition = async preserve => {
-      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`, mediaHistory = recentHistory("betterStartReaderMediaHistory"), avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(","), avoidStories = recentStoryAvoidance(), places = savedPlaces(), profileTerms = activeProfile ? [...(activeProfile.broadInterests || []), ...(activeProfile.specificInterests || []), ...(activeProfile.details || []), ...(activeProfile.granularInterests || []), ...(activeProfile.anythingElse || [])].slice(0, 72).join("|") : "";
+    const loadEdition = async (preserve, force = false) => {
+      const visit = `${Math.floor(Date.now() / EDITION_MS)}-${Date.now()}-${Math.random()}`, mediaHistory = recentHistory("betterStartReaderMediaHistory"), avoid = [...new Set(mediaHistory.map(entry => entry.id))].slice(-120).join(","), places = savedPlaces(), profileTerms = activeProfile ? [...(activeProfile.broadInterests || []), ...(activeProfile.specificInterests || []), ...(activeProfile.details || []), ...(activeProfile.granularInterests || []), ...(activeProfile.anythingElse || [])].slice(0, 72).join("|") : "";
       try {
         const today = localDayKey(new Date()), priorDay = localStorage.getItem("betterStartReaderDay"), hardRefresh = priorDay !== today;
+        const priorInventory = hardRefresh ? cachedSnapshot : force ? dataRef.current : null;
+        const inventoryItems = priorInventory ? [...(priorInventory.tickerStories || []), priorInventory.goodNews, ...(priorInventory.favorites || []), ...(priorInventory.gallery || []), ...(priorInventory.media || []), ...(priorInventory.serendipity || [])].filter(Boolean) : [];
+        const inventoryAvoidance = inventoryItems.flatMap(item => [itemKey(item), ...identityKeys(item)]).map(stableHash);
+        const avoidStories = [...new Set([...recentStoryAvoidance().split(",").filter(Boolean), ...inventoryAvoidance])].slice(-SEEN_STORY_LEDGER_LIMIT).join(",");
         // First paint waits for one balanced edition only. The background
         // queue then grows invisibly to 100, without blocking the front door.
         const editions = [await requestFeed({visit,avoid,avoidStories,places,interests:profileTerms,editionName:activeProfile?.title || ""})];
         localStorage.setItem("betterStartReaderDay", today); setJoyHistory(recentHistory("betterStartReaderJoyHistory"));
         if (preserve) setData(previous => {
-          const prepared = prepareEdition(editions[0], previous, !hardRefresh);
+          const prepared = {...prepareEdition(editions[0], previous, !hardRefresh && !force), _dayKey:today};
           try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
           return prepared;
         });
@@ -544,18 +549,19 @@ export default function Home() {
           const clean = editions.map(filterEditionGlobally), primary = clean[0];
           const reserved = [...(primary?.tickerStories || []), primary?.goodNews, ...(primary?.favorites || [])].filter(Boolean);
           const gallery = claimSessionUnique(clean.flatMap(edition => edition?.gallery || []), reserved).slice(0, 140);
-          const prepared = {...primary, gallery:stampNew(gallery)};
+          const prepared = {...primary, gallery:stampNew(gallery), _dayKey:today};
           try { localStorage.setItem(FEED_SNAPSHOT_KEY, JSON.stringify(prepared)); } catch {}
           setData(prepared);
         }
-        setEditionNote(`${preserve && !hardRefresh ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})} edition`); lastLoad = Date.now();
+        setBatches(1); setEditionNote(`${preserve && !hardRefresh && !force ? "Freshened" : "New"} ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})} edition`); lastLoad = Date.now();
       } catch {}
     };
+    refreshEditionRef.current = () => { setEditionNote("Making a fresh edition…"); loadEdition(false, true); };
     loadEdition(false);
     const clock = setInterval(() => setNow(new Date()), 60000), editionTimer = setInterval(() => loadEdition(true), EDITION_MS);
     const onVisible = () => { if (!document.hidden && Date.now() - lastLoad >= EDITION_MS) loadEdition(true); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { clearInterval(clock); clearInterval(editionTimer); document.removeEventListener("visibilitychange", onVisible); };
+    return () => { refreshEditionRef.current = null; clearInterval(clock); clearInterval(editionTimer); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
   const daypart = now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening";
@@ -676,7 +682,7 @@ export default function Home() {
     {showSaveNudge && <div className="saveNudge" role="dialog" aria-labelledby="save-nudge-title"><button className="saveNudgeClose" onClick={closeSaveNudge} aria-label="Dismiss save edition message">×</button><span>Your edition is looking good</span><h2 id="save-nudge-title">Want to keep it?</h2><p>Sign up with your email and we’ll save your personalized Meanwhile.</p><small>We won’t spam you or sell your information. Promise. We just want to help you keep your edition.</small><div><button onClick={openSaveAccount}>Save my edition</button><button onClick={closeSaveNudge}>Maybe later</button></div></div>}
     {showGenericNudge && <div className="saveNudge genericNudge" role="dialog" aria-labelledby="generic-nudge-title"><button className="saveNudgeClose" onClick={closeGenericNudge} aria-label="Dismiss personalized edition invitation">×</button><span>Meanwhile, but more you</span><h2 id="generic-nudge-title">Want your own edition?</h2><p>Tell us a little about what you love and we’ll weave more of it into your feed.</p><small>It never becomes a filter bubble. At least half of every edition stays broad, surprising and edited by Meanwhile.</small><div><a href="/make-it-yours" onClick={closeGenericNudge}>Make it mine</a><button onClick={closeGenericNudge}>Keep reading</button></div></div>}
     {accountOpen && <AccountPanel user={user} email={accountEmail} setEmail={setAccountEmail} status={accountStatus} onSendLink={sendSignInLink} onSignOut={signOut} onClose={() => setAccountOpen(false)} />}
-    <header className="mast"><div className="mastIdentity"><div className="brand brandVignelli" aria-label="Meanwhile">{"Meanwhile".split("").map((letter,index) => <span aria-hidden="true" style={{color:masthead[index]}} key={`${letter}-${index}`}>{letter}</span>)}</div>{editionTitle && <div className="editionName">{editionTitle}</div>}<div className="edition">Rage-free news, discovery & good times</div></div><div className="mastTools"><a className="personalizeButton" href="/make-it-yours">{profile ? "Tune my edition" : "Make it yours"}</a>{profile && <button className="genericButton" onClick={clearProfile}>Generic Edition</button>}<button className="accountButton" onClick={() => { setAccountStatus(user ? "Your Meanwhile is synced." : ""); setAccountOpen(true); }}>{user ? "My account" : "Sign in"}</button><button className="savedButton" onClick={() => setShowSaved(value => !value)}>Saved <b>{saved.length}</b></button><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Meanwhile Radio ${radio ? "on" : "off"}`} title="Meanwhile Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button><button className="themeToggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}><span>{theme === "dark" ? "☀" : "☾"}</span><small>{theme === "dark" ? "LIGHT" : "DARK"}</small></button></div></header>
+    <header className="mast"><div className="mastIdentity"><div className="brand brandVignelli" aria-label="Meanwhile">{"Meanwhile".split("").map((letter,index) => <span aria-hidden="true" style={{color:masthead[index]}} key={`${letter}-${index}`}>{letter}</span>)}</div>{editionTitle && <div className="editionName">{editionTitle}</div>}<div className="edition">Rage-free news, discovery & good times</div></div><div className="mastTools"><a className="personalizeButton" href="/make-it-yours">{profile ? "Tune my edition" : "Make it yours"}</a>{profile && <button className="genericButton" onClick={clearProfile}>Generic Edition</button>}<button className="refreshButton" onClick={() => refreshEditionRef.current?.()} aria-label="Load a completely fresh edition" title="Load a completely fresh edition"><span>↻</span><small>REFRESH</small></button><button className="accountButton" onClick={() => { setAccountStatus(user ? "Your Meanwhile is synced." : ""); setAccountOpen(true); }}>{user ? "My account" : "Sign in"}</button><button className="savedButton" onClick={() => setShowSaved(value => !value)}>Saved <b>{saved.length}</b></button><button className={`radio ${radio ? "radioOn" : ""}`} onClick={() => setRadio(!radio)} aria-label={`Meanwhile Radio ${radio ? "on" : "off"}`} title="Meanwhile Radio placeholder"><span>♪</span><small>{radio ? "ON" : "RADIO"}</small></button><button className="themeToggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}><span>{theme === "dark" ? "☀" : "☾"}</span><small>{theme === "dark" ? "LIGHT" : "DARK"}</small></button></div></header>
     <div className="hello"><h1>{greeting}.</h1><div className="helloAside"><p>{date}</p><span>{helloThought}</span></div></div>
 
     <section className="ribbon" aria-label="Quick facts"><div className="weatherFact"><b>{greeting}</b><span>{date}</span></div><GoodNewsWire items={spreadAdjacentSources(data?.tickerStories || (data?.ribbonFavorite ? [data.ribbonFavorite] : []))}/><RollingFact label={editionNote}>{smallDelight}</RollingFact></section>

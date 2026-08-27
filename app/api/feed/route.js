@@ -236,13 +236,18 @@ function composeVisualWindows(items, identity, count = 140, blockSize = 20) {
     _visualPriority:priority
   }));
   const result = [];
-  let nasaCount = 0;
+  const globallyLimitedCounts = new Map();
+  const globallyAllowed = item => {
+    const source = normalizeSource(item.source);
+    return !/^(?:nasa|jstor daily)$/.test(source) || (globallyLimitedCounts.get(source) || 0) < 1;
+  };
   const takeBest = predicate => {
     const choices = pool.filter(predicate).sort((a, b) => a._visualPriority - b._visualPriority);
     const winner = choices[0];
     if (!winner) return null;
     pool.splice(pool.indexOf(winner), 1);
-    if (normalizeSource(winner.source) === "nasa") nasaCount++;
+    const source = normalizeSource(winner.source);
+    if (/^(?:nasa|jstor daily)$/.test(source)) globallyLimitedCounts.set(source, (globallyLimitedCounts.get(source) || 0) + 1);
     const {_visualPriority, ...story} = winner;
     return story;
   };
@@ -250,9 +255,8 @@ function composeVisualWindows(items, identity, count = 140, blockSize = 20) {
     const block = [], target = Math.ceil(Math.min(blockSize, count - result.length) * Math.max(.7, identity.imageTarget || 0));
     const sourceCount = source => block.filter(item => normalizeSource(item.source) === source).length;
     const laneCount = lane => block.filter(item => item.mixLane === lane).length;
-    const allowedNASA = item => normalizeSource(item.source) !== "nasa" || nasaCount < 2;
     const chooseVisual = (sourceCap, laneCap) => takeBest(item =>
-      (item.image || item.videoId) && allowedNASA(item)
+      (item.image || item.videoId) && globallyAllowed(item)
       && sourceCount(normalizeSource(item.source)) < sourceCap
       && laneCount(item.mixLane) < laneCap
     );
@@ -262,17 +266,33 @@ function composeVisualWindows(items, identity, count = 140, blockSize = 20) {
       block.push(winner);
     }
     while (block.length < Math.min(blockSize, count - result.length) && pool.length) {
-      const winner = takeBest(item => allowedNASA(item)
+      const winner = takeBest(item => globallyAllowed(item)
         && sourceCount(normalizeSource(item.source)) < 2
         && laneCount(item.mixLane) < 3)
-        || takeBest(item => allowedNASA(item) && sourceCount(normalizeSource(item.source)) < 3)
-        || takeBest(allowedNASA);
+        || takeBest(item => globallyAllowed(item) && sourceCount(normalizeSource(item.source)) < 3)
+        || takeBest(globallyAllowed);
       if (!winner) break;
       block.push(winner);
     }
     result.push(...block);
   }
   return result;
+}
+
+function enforceVisualShare(items, target = .75, minimum = 100) {
+  const visuals = items.filter(item => item.image || item.videoId);
+  if (!visuals.length || visuals.length / items.length >= target) return items;
+  const textAllowance = Math.floor(visuals.length * (1 - target) / target);
+  let textCount = 0;
+  const selected = items.filter(item => {
+    if (item.image || item.videoId) return true;
+    if (textCount >= textAllowance) return false;
+    textCount++; return true;
+  });
+  if (selected.length >= minimum) return selected;
+  const selectedUrls = new Set(selected.map(item => canonicalUrl(item.url)));
+  selected.push(...items.filter(item => !selectedUrls.has(canonicalUrl(item.url))).slice(0, minimum - selected.length));
+  return selected;
 }
 
 const visualSearches = {
@@ -336,6 +356,8 @@ function isFreshLocal(item) {
   // NYT's desk feeds keep older entries available longer than this product's
   // live-feed promise permits, so they receive a deliberately tighter window.
   if (/^nyt\b/i.test(item.source || "")) return age <= 1.5;
+  if (/^jstor daily$/i.test(item.source || "")) return age <= 3;
+  if (/^nasa$/i.test(item.source || "")) return age <= 2;
   return age <= (item.sourcePack ? 120 : 45);
 }
 function isGoodNews(item) {
@@ -555,7 +577,7 @@ function balancedMagazine(candidates, count, interests = [], random = Math.rando
     const hardLaneLimit = item => item.mixLane === "sports" ? (sportsAllowedThisWindow ? 1 : 0) : item.mixLane === "fashion" ? 1 : 2;
     const obeysSourceAndFormatCaps = item => {
       const source = normalizeSource(item.source), pageCount = sourceCounts.get(source) || 0;
-      const pageLimit = /^nasa$/.test(source) ? 2 : 5;
+      const pageLimit = /^(?:nasa|jstor daily)$/.test(source) ? 1 : 5;
       const visual = item.image || item.videoId;
       return pageCount < pageLimit && !((item.visualShelf && blockVisualShelfCount >= 2) || blockSourceCount(source) >= 2 || (visual && (blockVisualSourceCount(source) >= 2 || blockVisualLaneCount(item.mixLane) >= 2)));
     };
@@ -634,7 +656,7 @@ function balancedMagazine(candidates, count, interests = [], random = Math.rando
 function completeMagazineBench(selected, candidates, count = 140, random = Math.random) {
   const result = [], seededSourceCounts = new Map();
   unique(selected).forEach(item => {
-    const source = normalizeSource(item.source), limit = source === "nasa" ? 2 : 8;
+    const source = normalizeSource(item.source), limit = /^(?:nasa|jstor daily)$/.test(source) ? 1 : 8;
     if ((seededSourceCounts.get(source) || 0) >= limit) return;
     seededSourceCounts.set(source, (seededSourceCounts.get(source) || 0) + 1); result.push(item);
   });
@@ -654,7 +676,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
       if (lane === "sports" && (!sportsAllowed || laneCount("sports") >= 1 || !humanInterestSports(item))) return false;
       if (lane === "fashion" && laneCount("fashion") >= 1) return false;
       if (laneCount(lane) >= 3 || sourceCount(source) >= 2) return false;
-      if (source === "nasa" && globalSourceCount(source) >= 2) return false;
+      if (/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1) return false;
       if ((item.image || item.videoId) && (visualSourceCount(source) >= 2 || visualLaneCount(lane) >= 2)) return false;
       if (!item.independentPublisher && mainstreamCount >= 2) return false;
       return true;
@@ -665,7 +687,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
       // The fallback may relax the ideal subject mix, but never the rules that
       // prevent one image-rich publisher (especially NASA) from taking over.
       return lane !== "sports"
-        && !(source === "nasa" && globalSourceCount(source) >= 2)
+        && !(/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1)
         && sourceCount(source) < 3
         && (!visual || (visualSourceCount(source) < 2 && visualLaneCount(lane) < 2))
         && (item.independentPublisher || mainstreamCount < 2);
@@ -673,7 +695,7 @@ function completeMagazineBench(selected, candidates, count = 140, random = Math.
     const depthFallback = remaining.filter(item => {
       const lane = item.mixLane || contentLane(item), source = normalizeSource(item.source);
       return lane !== "sports"
-        && !(source === "nasa" && globalSourceCount(source) >= 2)
+        && !(/^(?:nasa|jstor daily)$/.test(source) && globalSourceCount(source) >= 1)
         && sourceCount(source) < 4
         && (item.independentPublisher || mainstreamCount < 2);
     });
@@ -820,6 +842,16 @@ async function feedResponse(params) {
   results.forEach(result => { if (result.status === "fulfilled") all.push(...result.value); });
   all = unique(all.filter(item => item.score > 18 && !isDisallowed(item) && !wasRecentlyShown(item, avoidStories) && contextAllowed(item, editorialIdentity) && (isJoyful(item) || (item.sourcePack && isSpecialistWorthwhile(item))) && isFreshLocal(item)).map(item => personalize(item, interests)).sort((a, b) => b.score - a.score));
   all = await enrichIdentityImages(all, editorialIdentity);
+  // These two visually strong archive feeds can otherwise leak into several
+  // page regions. One shared gate means one NASA story and one JSTOR story in
+  // the entire response, including the wire, Bright Spots and deep bench.
+  const limitedSourceCounts = new Map();
+  all = all.filter(item => {
+    const source = normalizeSource(item.source);
+    if (!/^(?:nasa|jstor daily)$/.test(source)) return true;
+    if ((limitedSourceCounts.get(source) || 0) >= 1) return false;
+    limitedSourceCounts.set(source, 1); return true;
+  });
 
   // One shared registry across every page region makes duplicates impossible.
   const usedUrls = new Set(), usedTitles = new Set(), usedTopics = new Set(), usedAssets = new Set();
@@ -848,7 +880,7 @@ async function feedResponse(params) {
   const relevantMedia = videoPool.filter(item => item.personalFit !== "editorial" && (!fashionFocus || focusMediaSignal.test(`${item.title} ${item.summary} ${item.section}`)));
   // A strongly signaled fashion/women's edition never gets padded with
   // unrelated generic videos just because those thumbnails are available.
-  const mediaPool = fashionFocus ? relevantMedia : [...relevantMedia, ...videoPool.filter(item => item.personalFit === "editorial").slice(0, 5)];
+  const mediaPool = fashionFocus ? relevantMedia : [...relevantMedia, ...videoPool.filter(item => item.personalFit === "editorial").slice(0, 30)];
   // Playable media competes for the same subject slots as every other story.
   // Keeping it in a separate stream would quietly turn format into category.
   const mediaCandidates = compose(mediaPool, 24, {}, random);
@@ -910,6 +942,7 @@ async function feedResponse(params) {
   // Run the same editor once more on the final, deduplicated membership so
   // those removals cannot quietly push the remaining pictures to the bottom.
   gallery.splice(0, gallery.length, ...composeVisualWindows(gallery, editorialIdentity, gallery.length, 20));
+  gallery.splice(0, gallery.length, ...enforceVisualShare(gallery, .75, 100));
   const galleryKeys = new Set(gallery.map(item => canonicalUrl(item.url)));
   const visualReserve = allVisualShelf.slice(56).filter(item => !galleryKeys.has(canonicalUrl(item.url))).slice(0, 24).map(item => ({...item, canonicalUrl:canonicalUrl(item.url)}));
   // Serendipity is composed from what remains after the primary magazine. It
